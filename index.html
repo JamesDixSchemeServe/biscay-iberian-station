@@ -1389,33 +1389,6 @@ window.resolvePurchasedByAdmiralty = async function(id) {
   closeModal(); showToast(`${newName} added to roster`);
 };
 
-// ─── LOG MODAL ────────────────────────────────────────────────────────────────
-function showWideModal(html) {
-  const mc = document.getElementById('modal-content');
-  mc.innerHTML = html;
-  mc.style.maxWidth = '640px';
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-const _baseCloseModal = window.closeModal;
-window.closeModal = function() { document.getElementById('modal-content').style.maxWidth = ''; _baseCloseModal(); };
-
-function _letterTemplate(faction, rank, name, squadron, opponents, turn, phase, summary) {
-  const players = appData.players || {};
-  const oppList = (opponents||[]).map(o => { const p=players[o]; return p ? p.officerName+' ('+p.faction+')' : o; }).join(' and ');
-  const sqNote = squadron ? ', commanding the '+squadron+' Squadron,' : '';
-  const oppNote = oppList ? ' against the forces of '+oppList : '';
-  if (faction === 'French') {
-    return 'Au Ministre de la Marine et des Colonies,\n\nExcellence,\n\n'      + 'J\'ai l\'honneur de soumettre à Votre Excellence le rapport de l\'action qui s\'est tenue au cours du Tour '+turn+', Phase '+phase+', dans les eaux de la Station de Biscaye et d\'Ibérie.\n\n'      + 'Moi-même'+sqNote+' me suis trouvé en présence de l\'ennemi'+oppNote+'.\n\n'      + summary
-      + '\n\nLa conduite des officiers et des hommes placés sous mon commandement a été, en toutes circonstances, digne des plus grands éloges.\n\n'      + 'J\'ai l\'honneur d\'être, avec le plus profond respect, de Votre Excellence, le très humble et très obéissant serviteur,\n\n'      + rank+' '+name+'\nCommandant l\'Escadre'+(squadron?' — '+squadron:'');
-  }
-  if (faction === 'Spanish') {
-    return 'A Su Excelencia el Ministro de Marina,\n\nExcelencia,\n\n'      + 'Tengo el honor de presentar a Vuestra Excelencia el informe de la acción que tuvo lugar durante el Turno '+turn+', Fase '+phase+', en las aguas de la Estación del Golfo de Vizcaya e Iberia.\n\n'      + 'Yo mismo'+sqNote+' me enfronté'+oppNote+'.\n\n'      + summary
-      + '\n\nLa conducta de los oficiales y marineros bajo mi mando fue, en todo momento, digna del más alto elogio.\n\n'      + 'Tengo el honor de ser, con el más profundo respeto, de Vuestra Excelencia, el más humilde y obediente servidor,\n\n'      + rank+' '+name+'\nComandante'+(squadron?', Escuadra '+squadron:'');
-  }
-  return 'To the Lords Commissioners of the Admiralty,\n\nMy Lords,\n\n'    + 'I have the honour to most respectfully lay before your Lordships an account of the action which took place during Turn '+turn+', Phase '+phase+', in the waters of the Biscay & Iberian Station.\n\n'    + 'I'+sqNote+' found myself engaged'+oppNote+'.\n\n'    + summary
-    + '\n\nThe conduct of the officers and men under my command was, throughout, deserving of the highest praise.\n\n'    + 'I have the honour to be,\nMy Lords,\nYour Lordships\' most obedient servant,\n\n'    + rank+' '+name+'\nCommanding'+(squadron?', '+squadron+' Squadron':'');
-}
-
 function showWideModal(html) {
   const mc = document.getElementById('modal-content');
   mc.innerHTML = html;
