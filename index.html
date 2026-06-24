@@ -166,9 +166,6 @@
   </header>
   <nav id="main-nav">
     <button class="active" onclick="showTab('overview')">Overview</button>
-    <button onclick="showTab('british')">British</button>
-    <button onclick="showTab('french')">French</button>
-    <button onclick="showTab('spanish')">Spanish</button>
     <button onclick="showTab('merchant')">Convoy</button>
     <button onclick="showTab('log')">Log</button>
   </nav>
@@ -378,15 +375,35 @@ function renderCurrentTab() {
   if (!appData.meta) return;
   document.getElementById('hdr-turn').textContent = appData.meta.turn;
   document.getElementById('hdr-phase').textContent = appData.meta.phase;
+  rebuildNav();
   const c = document.getElementById('main-content');
-  switch(currentTab) {
-    case 'overview': c.innerHTML = renderOverview(); break;
-    case 'british':  c.innerHTML = renderFaction('British'); break;
-    case 'french':   c.innerHTML = renderFaction('French'); break;
-    case 'spanish':  c.innerHTML = renderFaction('Spanish'); break;
-    case 'merchant': c.innerHTML = renderMerchant(); break;
-    case 'log':      c.innerHTML = renderLog(); break;
+  const players = appData.players || {};
+  if (players[currentTab]) {
+    c.innerHTML = renderPlayer(currentTab);
+  } else {
+    switch(currentTab) {
+      case 'overview': c.innerHTML = renderOverview(); break;
+      case 'merchant': c.innerHTML = renderMerchant(); break;
+      case 'log':      c.innerHTML = renderLog(); break;
+      default:         c.innerHTML = renderOverview(); break;
+    }
   }
+}
+
+function rebuildNav() {
+  const nav = document.getElementById('main-nav');
+  const players = Object.entries(appData.players || {});
+  // Build player buttons
+  const playerBtns = players.map(([pid, p]) => {
+    const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${FACTION_COLOR[p.faction]};margin-right:5px;vertical-align:middle"></span>`;
+    const active = currentTab === pid ? ' active' : '';
+    return `<button class="${active}" onclick="showTab('${pid}')">${dot}${p.name}</button>`;
+  }).join('');
+  nav.innerHTML = `
+    <button class="${currentTab==='overview'?'active':''}" onclick="showTab('overview')">Overview</button>
+    ${playerBtns}
+    <button class="${currentTab==='merchant'?'active':''}" onclick="showTab('merchant')">Convoy</button>
+    <button class="${currentTab==='log'?'active':''}" onclick="showTab('log')">Log</button>`;
 }
 
 // ─── OVERVIEW ─────────────────────────────────────────────────────────────────
@@ -394,8 +411,22 @@ function renderOverview() {
   const players = appData.players || {};
   const ships = appData.ships || {};
   let html = `<div class="card"><div class="card-title">Campaign Status</div>
-    <div class="stat-row"><span class="stat-label">Game Turn</span><span class="stat-value">${appData.meta.turn}</span></div>
-    <div class="stat-row"><span class="stat-label">Phase</span><span class="stat-value">${phaseLabel(appData.meta.phase)}</span></div>
+    <div class="stat-row">
+      <span class="stat-label">Game Turn</span>
+      <span style="display:flex;align-items:center;gap:8px">
+        <button class="res-adj" onclick="adjustTurn(-1)">−</button>
+        <span class="stat-value">${appData.meta.turn}</span>
+        <button class="res-adj" onclick="adjustTurn(1)">+</button>
+      </span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Phase</span>
+      <span style="display:flex;align-items:center;gap:8px">
+        <button class="res-adj" onclick="adjustPhase(-1)">−</button>
+        <span class="stat-value">${phaseLabel(appData.meta.phase)}</span>
+        <button class="res-adj" onclick="adjustPhase(1)">+</button>
+      </span>
+    </div>
   </div>`;
   html += `<div class="player-row">`;
   for (const [pid, p] of Object.entries(players)) {
@@ -405,8 +436,8 @@ function renderOverview() {
     html += `<div class="player-card" onclick="showPlayerModal('${pid}')">
       <h3><span class="faction-dot" style="background:${FACTION_COLOR[p.faction]}"></span>${p.name}</h3>
       <div style="font-size:0.75rem;color:var(--text-muted)">${p.faction}</div>
-      <div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">res</span></div>
-      <div class="favour">Favour: <span class="favour-val ${favClass}">${favLabel}</span> · ${pShips} ships</div>
+      <div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">resources</span></div>
+      <div class="favour">Admiralty Favour: <span class="favour-val ${favClass}">${favLabel}</span> · ${pShips} ships</div>
     </div>`;
   }
   html += `</div>`;
@@ -422,6 +453,67 @@ function renderOverview() {
       <div class="stat-row"><span class="stat-label">Lost/Captured</span><span class="stat-value">${lost.length}</span></div>
     </div>`;
   }
+  return html;
+}
+
+window.adjustTurn = async function(delta) {
+  const newVal = Math.max(1, (appData.meta.turn || 1) + delta);
+  await update(ref(db, '/meta'), { turn: newVal });
+};
+
+window.adjustPhase = async function(delta) {
+  const newVal = Math.min(3, Math.max(1, (appData.meta.phase || 1) + delta));
+  await update(ref(db, '/meta'), { phase: newVal });
+};
+
+// ─── PLAYER VIEW ──────────────────────────────────────────────────────────────
+function renderPlayer(pid) {
+  const p = (appData.players || {})[pid];
+  if (!p) return '';
+  const allShips = appData.ships || {};
+  const favClass = p.admiraltyFavour > 0 ? 'fav-pos' : p.admiraltyFavour < 0 ? 'fav-neg' : 'fav-zero';
+  const favLabel = p.admiraltyFavour > 0 ? `+${p.admiraltyFavour}` : `${p.admiraltyFavour}`;
+
+  let html = `<div class="player-row" style="grid-template-columns:1fr">
+    <div class="player-card" onclick="showPlayerModal('${pid}')">
+      <h3><span class="faction-dot" style="background:${FACTION_COLOR[p.faction]}"></span>${p.name} <span style="font-size:0.75rem;color:var(--text-muted)">(${p.faction})</span></h3>
+      <div style="font-size:0.8rem;color:var(--text-muted);margin-top:2px">${p.officerName} · ${p.rank === 'Post Captain' ? 'Post Captain' : 'Master and Commander'}</div>
+      <div style="display:flex;gap:16px;margin-top:8px">
+        <div><div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">resources</span></div></div>
+        <div><div class="res"><span class="favour-val ${favClass}">${favLabel}</span> <span style="font-size:0.7rem;color:var(--text-muted)">admiralty favour</span></div></div>
+      </div>
+    </div>
+  </div>`;
+
+  html += `<div class="filter-bar">
+    ${['all','active','repairing','lost'].map(f => `<button class="filter-btn${activeFilter===f?' active':''}" onclick="setFilter('${f}')">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`).join('')}
+  </div>`;
+
+  html += `<div class="ships-header"><div></div><button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button></div>`;
+
+  const pShips = Object.entries(allShips)
+    .filter(([,s]) => s.player === pid)
+    .filter(([,s]) => activeFilter === 'all' || s.status === activeFilter);
+
+  const active = pShips.filter(([,s]) => s.status === 'active');
+  const repairing = pShips.filter(([,s]) => s.status === 'repairing');
+  const lost = pShips.filter(([,s]) => s.status === 'lost');
+
+  if (activeFilter === 'all' || activeFilter === 'active') {
+    const bySquadron = {};
+    active.forEach(([id,s]) => { const sq = s.squadron || '(no squadron)'; (bySquadron[sq]||(bySquadron[sq]=[])).push([id,s]); });
+    for (const [sq, sqs] of Object.entries(bySquadron)) {
+      html += `<div class="section-label">${sq !== '(no squadron)' ? `Squadron ${sq}` : 'Individual / Detached'}</div>`;
+      html += `<div class="ship-list">${sqs.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+    }
+  }
+  if ((activeFilter === 'all' || activeFilter === 'repairing') && repairing.length) {
+    html += `<div class="section-label">In Repair</div><div class="ship-list">${repairing.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+  }
+  if ((activeFilter === 'all' || activeFilter === 'lost') && lost.length) {
+    html += `<div class="section-label">Lost / Captured</div><div class="ship-list">${lost.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+  }
+  if (!pShips.length) html += `<div class="empty-state">No ships to show.</div>`;
   return html;
 }
 
@@ -503,7 +595,7 @@ function shipCard(id, s) {
       <div>
         <div class="ship-name">${s.name}</div>
         <div class="ship-type">${s.type}${s.officer ? ` · <em>${s.officer}</em>` : ''}</div>
-        ${s.squadron ? `<div class="squadron-label">Sqn ${s.squadron}</div>` : ''}
+        ${s.squadron ? `<div class="squadron-label">Squadron ${s.squadron}</div>` : ''}
       </div>
       <div class="ship-actions">
         <button class="btn btn-sm btn-ghost" onclick="openEditShip('${id}')">Edit</button>
