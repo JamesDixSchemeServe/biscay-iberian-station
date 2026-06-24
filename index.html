@@ -208,6 +208,17 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Fallback: if Firebase module fails to load, show setup screen -->
+<script>
+setTimeout(function() {
+  var l = document.getElementById('loading');
+  if (l && l.style.display !== 'none') {
+    l.style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'block';
+  }
+}, 5000);
+</script>
+
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
