@@ -743,17 +743,17 @@ function shipCard(id, s) {
         <button class="btn btn-sm btn-ghost" onclick="openEditShip('${id}')">Edit</button>
       </div>
     </div>
-    ${(s.broadsides||s.knots||s.size) ? `<div class="ship-stats">
+    <div class="ship-stats">
       ${s.size       ? `<div class="ship-stat"><span class="ss-label">Size</span><span class="ss-val">${s.size}</span></div>` : ''}
+      ${s.bowChaser  ? `<div class="ship-stat"><span class="ss-label">Bow</span><span class="ss-val">${s.bowChaser}</span></div>` : ''}
       ${s.broadsides ? `<div class="ship-stat"><span class="ss-label">Broadsides</span><span class="ss-val">${s.broadsides}</span></div>` : ''}
-      ${s.sternChaser && s.sternChaser!=='-' ? `<div class="ship-stat"><span class="ss-label">Stern</span><span class="ss-val">${s.sternChaser}</span></div>` : ''}
-      ${s.bowChaser   && s.bowChaser!=='-'   ? `<div class="ship-stat"><span class="ss-label">Bow</span><span class="ss-val">${s.bowChaser}</span></div>` : ''}
+      ${s.sternChaser? `<div class="ship-stat"><span class="ss-label">Stern</span><span class="ss-val">${s.sternChaser}</span></div>` : ''}
+      <div class="ship-stat"><span class="ss-label">SP</span><span class="ss-val">${s.spCurrent}/${s.spMax}</span></div>
       ${s.turnAngle  ? `<div class="ship-stat"><span class="ss-label">Turn</span><span class="ss-val ss-${(s.turnAngle||'').toLowerCase()}">${s.turnAngle}</span></div>` : ''}
       ${s.knots      ? `<div class="ship-stat"><span class="ss-label">Knots</span><span class="ss-val">${s.knots}</span></div>` : ''}
       ${s.breakValue ? `<div class="ship-stat"><span class="ss-label">Break</span><span class="ss-val">${s.breakValue}</span></div>` : ''}
-    </div>` : ''}
+    </div>
         <div class="ship-meta">
-      <span class="tag sp ${spClass}">SP ${s.spCurrent}/${s.spMax}</span>
       <span class="tag ${crewClass}">${s.crewLevel} Crew</span>
       <span class="tag">${s.location}</span>
       ${s.battlesWithoutStriking > 0 ? `<span class="tag">${s.battlesWithoutStriking} battle${s.battlesWithoutStriking>1?'s':''}</span>` : ''}
