@@ -1,2 +1,2 @@
-# dixie..github.io
+# dixie.github.io
 Dixie repository
