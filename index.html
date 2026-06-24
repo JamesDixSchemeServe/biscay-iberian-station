@@ -215,18 +215,44 @@
 </div>
 
 <!-- Ship Builder Overlay -->
-<div id="builder-overlay" class="builder-overlay" style="display:none">
-  <div class="builder-header">
-    <div>
-      <h2>&#x2693; Ship Builder</h2>
-      <p>Design your ship, then click Continue to add it to the campaign.</p>
+<div id="builder-overlay" class="builder-overlay" style="display:none" onclick="builderOverlayClick(event)">
+  <div class="builder-modal" id="builder-modal">
+    <button class="modal-close" onclick="closeBuilder()">&#x2715;</button>
+    <h2>&#x2693; Ship Builder</h2>
+    <p class="subtitle">Design your ship. Stats will be carried through to the fleet.</p>
+
+    <div class="form-grid">
+      <div class="form-row"><label>Ship Name</label><input id="bldr-name" placeholder="e.g. HMS Badger"></div>
+      <div class="form-row"><label>Ship Type</label><select id="bldr-type" onchange="builderCalc()"></select></div>
     </div>
-    <div class="builder-actions">
-      <button class="btn btn-ghost btn-sm" id="builder-skip-btn">Skip Builder</button>
-      <button class="btn btn-sm" id="builder-continue-btn">Continue to Ship Details &rarr;</button>
+    <div class="form-grid">
+      <div class="form-row"><label>Total Guns</label><input type="number" id="bldr-guns" value="36" min="0" max="120" onchange="builderCalc()" oninput="builderCalc()"></div>
+      <div class="form-row"><label>Crew Experience</label><select id="bldr-crew" onchange="builderCalc()">
+        <option>Inexperienced</option><option selected>Regular</option><option>Veteran</option>
+      </select></div>
+    </div>
+
+    <div class="section-label" style="margin-top:14px">Armament</div>
+    <div class="deck-header">
+      <label>Deck Name</label><label>Guns</label><label>Caliber</label><label>Type</label><label></label>
+    </div>
+    <div id="bldr-decks"></div>
+    <button class="btn btn-ghost btn-sm" onclick="builderAddDeck()" style="margin-top:4px">+ Add Gun Deck</button>
+
+    <div class="section-label" style="margin-top:14px">Upgrades</div>
+    <div class="upgrade-grid" id="bldr-upgrades"></div>
+
+    <div class="preview-bar" id="bldr-preview">
+      <div class="preview-stat">SP: <span id="prev-sp">—</span></div>
+      <div class="preview-stat">Broadsides: <span id="prev-broad">—</span></div>
+      <div class="preview-stat">Cost: <span id="prev-cost">—</span> pts</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeBuilder()">Cancel</button>
+      <button class="btn" onclick="builderCreateShip()">Create Ship &rarr;</button>
     </div>
   </div>
-  <iframe class="builder-iframe" src="https://linusnapoleonicshipyard.github.io/shipwright-s-armory/" title="Ship Builder"></iframe>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -947,32 +973,158 @@ window.openEditShip = function(id) {
     </div>`);
 };
 
-window.openAddShip = function(playerId, faction) {
-  document.getElementById('builder-overlay').style.display = 'flex';
-  document.getElementById('builder-continue-btn').onclick = function() {
-    document.getElementById('builder-overlay').style.display = 'none';
-    openAddShipForm(playerId, faction);
-  };
-  document.getElementById('builder-skip-btn').onclick = function() {
-    document.getElementById('builder-overlay').style.display = 'none';
-    openAddShipForm(playerId, faction);
-  };
-};
+// ─── SHIP BUILDER ─────────────────────────────────────────────────────────────
+const BUILDER_UPGRADES = [
+  { id:'sturdy',         name:'Sturdy',          cost:{XL:120,L:80,M:50,S:30,T:15},  excludes:[] },
+  { id:'over_gunned',    name:'Over Gunned',      cost:{XL:80,L:65,M:45,S:0,T:0},    excludes:['carronade_refit'], sizes:['XL','L','M'] },
+  { id:'master_gunner',  name:'Master Gunner',    cost:{XL:150,L:120,M:80,S:50,T:30},excludes:[] },
+  { id:'marines',        name:'Marines',          cost:{XL:60,L:45,M:30,S:20,T:10},  excludes:['privateer'] },
+  { id:'privateer',      name:'Privateer',        cost:{XL:0,L:40,M:30,S:20,T:10},   excludes:['marines'], sizes:['L','M','S','T'] },
+  { id:'carronade_refit',name:'Carronade Refit',  cost:{XL:40,L:30,M:20,S:15,T:10},  excludes:['over_gunned'] },
+];
+const CALIBERS = [4,6,9,12,18,24,32,36,42];
+let _bldrDecks = [];
+let _bldrDeckId = 3;
+let _bldrPlayer = null, _bldrFaction = null, _bldrUpgrades = [];
 
-window.openAddShipForm = function(playerId, faction) {
-  const blank = { player: playerId, faction, name:'', type:'', cost:0, spCurrent:13, spMax:13, location:'Zone 1', squadron:'', crewLevel:'Inexperienced', status:'active', battlesWithoutStriking:0, officer:'', repairPort:'', repairCostPaid:0, availableIn:'', notes:'' };
+function _bSize(type) {
+  const t = type.toLowerCase();
+  if (t.includes('1st rate')||t.includes('2nd rate')) return 'XL';
+  if (t.includes('3rd rate')||t.includes('4th rate')||t.includes('heavy frigate')||t.includes('razee')||t.includes('east indiaman')||t.includes('manila galleon')) return 'L';
+  if (t.includes('5th rate')||t.includes('6th rate')||t.includes('frigate')||t.includes('merchantman')) return 'M';
+  if (t.includes('brig')||t.includes('sloop')||t.includes('corvette')||t.includes('schooner')||t.includes('xebec')||t.includes('polacre')||t.includes('privateer')||t.includes('letter of marque')||t.includes('packet')) return 'S';
+  return 'T';
+}
+function _bCat(caliber, type) {
+  if (type==='carronade') { return caliber>=25?'HC':caliber>=13?'C':'LC'; }
+  return caliber>=25?'H':caliber>=13?'M':'L';
+}
+function _bDice(guns) {
+  if (guns<=0) return 0;
+  if (guns<=9) return 1;
+  const d = Math.round(Math.round(guns/2)/5);
+  return (guns>=10&&d===0)?1:d;
+}
+function _isChaseDeck(n) { const l=n.toLowerCase(); return l.includes('bow')||l.includes('stern')||l.includes('chase'); }
+function _bBroadsides(decks) {
+  const cats={H:0,M:0,L:0,HC:0,C:0,LC:0};
+  const vals={H:15,M:10,L:5,HC:20,C:15,LC:5};
+  for (const d of decks) { if (_isChaseDeck(d.name)) continue; cats[_bCat(d.caliber,d.type)]+=d.guns; }
+  const parts=[];
+  for (const [c,g] of Object.entries(cats)) { if (g>0) { const dice=_bDice(g); if(dice>0) parts.push({cat:c,dice,val:vals[c]}); } }
+  parts.sort((a,b)=>b.val-a.val);
+  return parts;
+}
+
+function builderCalc() {
+  const guns = parseInt(document.getElementById('bldr-guns').value)||0;
+  const type = document.getElementById('bldr-type').value||'';
+  const crew = document.getElementById('bldr-crew').value;
+  const sp = Math.round(guns*1.25);
+  const parts = _bBroadsides(_bldrDecks);
+  let cost = sp*4;
+  for (const p of parts) cost += p.dice*p.val;
+  const crewMod = {Inexperienced:-0.20,Regular:0,Veteran:0.20};
+  cost = Math.round(cost*(1+(crewMod[crew]||0)));
+  const size = _bSize(type);
+  for (const uid of _bldrUpgrades) {
+    const u = BUILDER_UPGRADES.find(x=>x.id===uid);
+    if (u) cost += (u.cost[size]||0);
+  }
+  const broadStr = parts.length ? parts.map(p=>p.dice+p.cat).join('-') : '—';
+  document.getElementById('prev-sp').textContent = sp;
+  document.getElementById('prev-broad').textContent = broadStr;
+  document.getElementById('prev-cost').textContent = cost;
+  _renderUpgrades(size);
+}
+
+function _renderDecks() {
+  document.getElementById('bldr-decks').innerHTML = _bldrDecks.map(d=>`
+    <div class="deck-row">
+      <input value="${d.name}" placeholder="Deck name" oninput="builderDeckUpdate(${d.id},'name',this.value)">
+      <input type="number" value="${d.guns}" min="0" max="60" oninput="builderDeckUpdate(${d.id},'guns',+this.value)" style="text-align:center">
+      <select onchange="builderDeckUpdate(${d.id},'caliber',+this.value)">${CALIBERS.map(c=>`<option value="${c}"${c===d.caliber?' selected':''}>${c}lb</option>`).join('')}</select>
+      <select onchange="builderDeckUpdate(${d.id},'type',this.value)">
+        <option value="long"${d.type==='long'?' selected':''}>Long Gun</option>
+        <option value="carronade"${d.type==='carronade'?' selected':''}>Carronade</option>
+      </select>
+      <button class="deck-remove" onclick="builderRemoveDeck(${d.id})" title="Remove">&#x2715;</button>
+    </div>`).join('');
+}
+
+function _renderUpgrades(size) {
+  document.getElementById('bldr-upgrades').innerHTML = BUILDER_UPGRADES.map(u => {
+    const allowed = !u.sizes || u.sizes.includes(size);
+    const cost = u.cost[size]||0;
+    const excluded = !_bldrUpgrades.includes(u.id) && u.excludes.some(id=>_bldrUpgrades.includes(id));
+    const checked = _bldrUpgrades.includes(u.id);
+    const disabled = !allowed || excluded;
+    return `<label class="upgrade-item${disabled?' disabled':''}">
+      <input type="checkbox" ${checked?'checked':''} ${disabled?'disabled':''} onchange="builderToggleUpgrade('${u.id}',this.checked)">
+      <span>${u.name}</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:auto">+${cost}</span>
+    </label>`;
+  }).join('');
+}
+
+window.builderDeckUpdate = function(id, field, val) {
+  const d = _bldrDecks.find(x=>x.id===id); if(d) d[field]=val; builderCalc();
+};
+window.builderRemoveDeck = function(id) {
+  if (_bldrDecks.length<=1) return;
+  _bldrDecks = _bldrDecks.filter(d=>d.id!==id);
+  _renderDecks(); builderCalc();
+};
+window.builderAddDeck = function() {
+  _bldrDecks.push({id:_bldrDeckId++,name:'',guns:10,caliber:9,type:'long'});
+  _renderDecks(); builderCalc();
+};
+window.builderToggleUpgrade = function(id, on) {
+  if (on) _bldrUpgrades.push(id);
+  else _bldrUpgrades = _bldrUpgrades.filter(x=>x!==id);
+  builderCalc();
+};
+window.closeBuilder = function() { document.getElementById('builder-overlay').style.display='none'; };
+window.builderOverlayClick = function(e) { if(e.target===document.getElementById('builder-overlay')) closeBuilder(); };
+
+function openBuilder(playerId, faction) {
+  _bldrPlayer = playerId; _bldrFaction = faction;
+  _bldrDecks = [{id:1,name:'Main Deck',guns:26,caliber:18,type:'long'},{id:2,name:'QD/FC',guns:10,caliber:9,type:'long'}];
+  _bldrDeckId = 3; _bldrUpgrades = [];
+  const sel = document.getElementById('bldr-type');
+  sel.innerHTML = SHIP_TYPES.map(t=>`<option>${t}</option>`).join('');
+  sel.value = '5th Rate Frigate';
+  document.getElementById('bldr-name').value = '';
+  document.getElementById('bldr-guns').value = 36;
+  document.getElementById('bldr-crew').value = 'Regular';
+  _renderDecks(); builderCalc();
+  document.getElementById('builder-overlay').style.display = 'flex';
+}
+
+window.builderCreateShip = function() {
+  const sp   = parseInt(document.getElementById('prev-sp').textContent)||0;
+  const cost = parseInt(document.getElementById('prev-cost').textContent)||0;
+  const name = document.getElementById('bldr-name').value.trim();
+  const type = document.getElementById('bldr-type').value;
+  const crew = document.getElementById('bldr-crew').value;
+  const broad= document.getElementById('prev-broad').textContent;
+  closeBuilder();
+  const blank = { player:_bldrPlayer, faction:_bldrFaction, name, type, cost, spCurrent:sp, spMax:sp,
+    location:'Zone 1', squadron:'', crewLevel:crew, status:'active', battlesWithoutStriking:0,
+    officer:'', repairPort:'', repairCostPaid:0, availableIn:'', notes:`Broadsides: ${broad}` };
   showModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
     <h2>Add New Ship</h2>
-    <div style="margin-bottom:12px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);font-size:0.8rem;color:var(--text-muted);">
-      Use the stats from the Ship Builder to fill in cost and SP below.
-      <button class="btn btn-ghost btn-sm" style="margin-left:8px" onclick="document.getElementById('builder-overlay').style.display='flex'">&#x2693; Re-open Builder</button>
-    </div>
     ${shipFormHtml(blank)}
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="addShip('${playerId}','${faction}')">Add Ship</button>
+      <button class="btn" onclick="addShip('${_bldrPlayer}','${_bldrFaction}')">Add Ship</button>
     </div>`);
 };
+
+window.openAddShip = function(playerId, faction) {
+  openBuilder(playerId, faction);
+};
+
+
 window.saveShip = async function(id) {
   const existing = (appData.ships || {})[id];
   const data = readShipForm(existing);
