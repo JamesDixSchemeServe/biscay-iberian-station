@@ -1108,37 +1108,99 @@ function _asCat(caliber, type) {
   if (type==='carronade') return caliber>=25?'HC':caliber>=13?'C':'LC';
   return caliber>=25?'H':caliber>=13?'M':'L';
 }
-function _asDice(guns) {
-  if (guns<=0) return 0;
-  if (guns<=9) return 1;
-  const d = Math.round(Math.round(guns/2)/5);
-  return (guns>=10&&d===0)?1:d;
-}
 function _round5(n) { return Math.round(n/5)*5; }
 
+function _diceCap(type) {
+  const t=(type||'').toLowerCase();
+  if(t.includes('1st rate')) return 15;
+  if(t.includes('2nd rate')) return 11;
+  if(t.includes('3rd rate')) return 8;
+  if(t.includes('razee')) return 7;
+  if(t.includes('heavy frigate')||t.includes('4th rate')) return 6;
+  if(t.includes('5th rate')||t.includes('frigate')) return 5;
+  if(t.includes('6th rate')||t.includes('ship-sloop')||t.includes('ship sloop')) return 4;
+  if(t.includes('brig')||t.includes('sloop')||t.includes('corvette')) return 4;
+  return 3;
+}
+
+function _calcBroadsideDice(decks, shipType) {
+  // 1. Accumulate guns per category; track per-caliber counts; QD/FC carronades
+  const catGuns={H:0,M:0,L:0,HC:0,C:0,LC:0};
+  const calByCat={H:{},M:{},L:{},HC:{},C:{},LC:{}};
+  const qdCarr={HC:0,C:0,LC:0};
+  for (const d of decks) {
+    const cat=_asCat(d.caliber,d.type);
+    catGuns[cat]+=d.guns;
+    calByCat[cat][d.caliber]=(calByCat[cat][d.caliber]||0)+d.guns;
+    if(['HC','C','LC'].includes(cat)) {
+      const n=(d.name||'').toLowerCase();
+      if(n.includes('qd')||n.includes('fc')||n.includes('quarter')) qdCarr[cat]+=d.guns;
+    }
+  }
+  // 2. Broadside = halve+round; dice = /5 rounded
+  const dice={H:0,M:0,L:0,HC:0,C:0,LC:0};
+  for (const cat of BROAD_CATS) {
+    dice[cat]=Math.round(Math.round(catGuns[cat]/2)/5);
+  }
+  // 3. Minimum dice rules
+  for (const cat of BROAD_CATS) {
+    if(catGuns[cat]>=10 && dice[cat]<1) dice[cat]=1;
+  }
+  for (const cat of ['HC','C','LC']) {
+    if(qdCarr[cat]>=4 && dice[cat]<1) dice[cat]=1;
+  }
+  const size=_shipSize(shipType);
+  const totalGuns=Object.values(catGuns).reduce((a,b)=>a+b,0);
+  if((size==='S'||size==='T') && totalGuns>=1 && totalGuns<=9 && dice['L']<1) dice['L']=1;
+  // 4. Top-caliber bonus
+  const gunsAt=(cat,minCal)=>Object.entries(calByCat[cat]).filter(([c])=>+c>=minCal).reduce((s,[,g])=>s+g,0);
+  if(gunsAt('H',36)>=10) dice['H']+=2;
+  else if(gunsAt('H',32)>=10) dice['H']+=1;
+  if(gunsAt('M',24)>=10) dice['M']+=1;
+  if(gunsAt('L',12)>=10) dice['L']+=1;
+  if(gunsAt('C',24)>=10) dice['C']+=1;
+  if(gunsAt('LC',12)>=10) dice['LC']+=1;
+  // 5. Cap; trim lighter calibres first (L→LC→M→C→H→HC)
+  const cap=_diceCap(shipType);
+  let total=Object.values(dice).reduce((a,b)=>a+b,0);
+  for (const cat of ['L','LC','M','C','H','HC']) {
+    if(total<=cap) break;
+    const cut=Math.min(dice[cat],total-cap);
+    dice[cat]-=cut; total-=cut;
+  }
+  return dice;
+}
+
 function _asSuggestBroad() {
-  const cats={H:0,M:0,L:0,HC:0,C:0,LC:0};
-  for (const d of _asDecks) { const c=_asCat(d.caliber,d.type); cats[c]+=d.guns; }
-  for (const cat of BROAD_CATS) _asBroad[cat]=_asDice(cats[cat]);
+  const type=document.getElementById('as-type')?.value||document.getElementById('sf-type')?.value||'';
+  const d=_calcBroadsideDice(_asDecks, type);
+  for (const cat of BROAD_CATS) _asBroad[cat]=d[cat];
   _renderAsBroad();
 }
 
 function asCalc() {
-  const guns = parseInt(document.getElementById('as-guns')?.value)||0;
-  const crew = document.getElementById('as-crew')?.value||'Regular';
-  const fast = document.getElementById('as-fastsailer')?.checked||false;
-  const swiv = document.getElementById('as-swivels')?.checked||false;
-  const sp   = Math.round(guns*1.25);
-  let base   = sp*4;
-  for (const cat of BROAD_CATS) base += (_asBroad[cat]||0)*(BROAD_VALS[cat]||0);
-  if (swiv) base += 15;
-  if (fast) base = Math.round(base*1.12);
-  base = _round5(base);
-  const crewMod = {Inexperienced:-0.20,Regular:0,Veteran:0.20};
-  const cost = Math.round(base*(1+(crewMod[crew]||0)));
-  const spEl=document.getElementById('as-spCurrent'), spMEl=document.getElementById('as-spMax'), cEl=document.getElementById('as-cost');
+  const guns=parseInt(document.getElementById('as-guns')?.value)||0;
+  const crew=(document.getElementById('as-crew')||document.getElementById('sf-crew'))?.value||'Regular';
+  const fast=document.getElementById('as-fastsailer')?.checked||false;
+  const swiv=document.getElementById('as-swivels')?.checked||false;
+  const bow=document.getElementById('as-bow')?.value||'';
+  const stern=document.getElementById('as-stern')?.value||'';
+  const sp=Math.round(guns*1.25);
+  let base=sp*4;
+  for (const cat of BROAD_CATS) base+=(_asBroad[cat]||0)*(BROAD_VALS[cat]||0);
+  if(bow)  base+=(BROAD_VALS[bow]||0);
+  if(stern) base+=(BROAD_VALS[stern]||0);
+  if(swiv) base+=15;
+  if(fast) base=Math.round(base*1.12);
+  base=_round5(base);
+  const crewMod={Inexperienced:-0.20,Regular:0,Veteran:0.20};
+  const cost=Math.round(base*(1+(crewMod[crew]||0)));
+  const spEl=document.getElementById('as-spCurrent'),spMEl=document.getElementById('as-spMax'),cEl=document.getElementById('as-cost');
   if(spEl) spEl.value=sp; if(spMEl) spMEl.value=sp; if(cEl) cEl.value=cost;
 }
+
+window.asCalc = asCalc;
+window.asTypeChange = function() { _asSuggestBroad(); asCalc(); };
 
 function _renderAsDecks() {
   if (!document.getElementById('as-decks')) return;
@@ -1196,7 +1258,7 @@ window.openAddShip = function(playerId, faction) {
 
     <div class="form-row"><label>Ship Name</label><input id="as-name" placeholder="e.g. HMS Badger"></div>
     <div class="form-grid">
-      <div class="form-row"><label>Type</label><select id="as-type" onchange="asCalc()">${['',...SHIP_TYPES].map(t=>`<option value="${t}">${t||'— select type —'}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Type</label><select id="as-type" onchange="asTypeChange()">${['',...SHIP_TYPES].map(t=>`<option value="${t}">${t||'— select type —'}</option>`).join('')}</select></div>
       <div class="form-row"><label>Crew Level</label><select id="as-crew" onchange="asCalc()">${CREW_LEVELS.map(c=>`<option${c==='Regular'?' selected':''}>${c}</option>`).join('')}</select></div>
     </div>
     <div class="form-grid">
@@ -1222,12 +1284,12 @@ window.openAddShip = function(playerId, faction) {
       <label class="upgrade-item"><input type="checkbox" id="as-swivels" onchange="asCalc()"> <span>Swivel Guns</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:6px">(+15 pts, boarding bonus)</span></label>
     </div>
     <div class="form-grid" style="margin-top:10px">
-      <div class="form-row"><label>Bow Chaser</label><select id="as-bow">
+      <div class="form-row"><label>Bow Chaser</label><select id="as-bow" onchange="asCalc()">
         <option value="">None</option>
         <option value="L">Lt. Long Gun</option><option value="M">Med. Long Gun</option><option value="H">Hvy. Long Gun</option>
         <option value="LC">Lt. Carronade</option><option value="C">Carronade</option><option value="HC">Hvy. Carronade</option>
       </select></div>
-      <div class="form-row"><label>Stern Chaser</label><select id="as-stern">
+      <div class="form-row"><label>Stern Chaser</label><select id="as-stern" onchange="asCalc()">
         <option value="">None</option>
         <option value="L">Lt. Long Gun</option><option value="M">Med. Long Gun</option><option value="H">Hvy. Long Gun</option>
         <option value="LC">Lt. Carronade</option><option value="C">Carronade</option><option value="HC">Hvy. Carronade</option>
