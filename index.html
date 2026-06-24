@@ -928,15 +928,31 @@ function renderMap() {
   const players = appData.players || {};
   const FC = { British:'#c73535', French:'#2255a8', Spanish:'#8822a0' };
 
+  // Exclude sunk/lost ships
+  const activeShips = Object.entries(ships).filter(([,s]) =>
+    s.location && s.status !== 'sunk' && s.status !== 'lost'
+  );
+
   // Group into squadrons: key = location|playerId|squadron
   const groups = {};
-  Object.entries(ships).forEach(([id, s]) => {
-    if (!s.location) return;
+  activeShips.forEach(([id, s]) => {
     const sqn = s.squadron || '';
     const key = `${s.location}|||${s.player}|||${sqn}`;
     if (!groups[key]) groups[key] = { location: s.location, playerId: s.player, faction: s.faction, squadron: sqn, ships: [] };
     groups[key].ships.push({id, ...s});
   });
+
+  // Simple overlap nudge: push down until clear
+  const placed = [];
+  function findClear(x, y) {
+    const DX = 9, DY = 3.5;
+    for (let attempt = 0; attempt < 15; attempt++) {
+      if (placed.every(p => Math.abs(p.x - x) >= DX || Math.abs(p.y - y) >= DY)) break;
+      y += DY;
+    }
+    placed.push({x, y});
+    return {x, y};
+  }
 
   const bubbles = [];
   const locCounters = {};
@@ -949,15 +965,17 @@ function renderMap() {
     let x, y, atPort;
     const portPos = MAP_PORT_POS[loc];
     if (portPos) {
-      // At a named port: arrange groups in a row below the anchor
-      x = portPos.x + (idx - 0.5) * 8;
-      y = portPos.y + 5 + idx * 1.5;
+      x = portPos.x + (idx % 2 === 0 ? -4 : 4);
+      y = portPos.y + 5 + Math.floor(idx / 2) * 4;
       atPort = true;
     } else {
       const slots = MAP_ZONE_SLOTS[loc] || [];
       const pos = slots[idx % slots.length] || { x: 30, y: 50 };
       x = pos.x; y = pos.y; atPort = false;
     }
+
+    const resolved = findClear(x, y);
+    x = resolved.x; y = resolved.y;
 
     const p = players[grp.playerId] || {};
     const playerShort = (p.name || grp.playerId || '?').slice(0, 8);
