@@ -158,7 +158,11 @@
   .ship-stats { display:flex; flex-wrap:wrap; gap:0; margin-top:8px; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
   .ship-stat { flex:1; min-width:44px; padding:4px 6px; text-align:center; border-right:1px solid var(--border); }
   .ship-stat:last-child { border-right:none; }
-  .ship-stat .ss-label { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); display:block; }
+  .ship-stat-sp { min-width:70px; }
+  .sp-adj-row { display:flex; align-items:center; justify-content:center; gap:4px; }
+  .sp-adj-btn { background:var(--surface); border:1px solid var(--border); color:var(--text-muted); border-radius:3px; width:18px; height:18px; font-size:0.75rem; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center; padding:0; flex-shrink:0; }
+  .sp-adj-btn:hover { border-color:var(--accent); color:var(--accent); }
+    .ship-stat .ss-label { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); display:block; }
   .ship-stat .ss-val { font-size:0.82rem; font-weight:bold; color:var(--text); display:block; }
   .ss-red { color:var(--red) !important; }
   .ss-yellow { color:var(--accent) !important; }
@@ -748,7 +752,7 @@ function shipCard(id, s) {
       ${s.bowChaser  ? `<div class="ship-stat"><span class="ss-label">Bow</span><span class="ss-val">${s.bowChaser}</span></div>` : ''}
       ${s.broadsides ? `<div class="ship-stat"><span class="ss-label">Broadsides</span><span class="ss-val">${s.broadsides}</span></div>` : ''}
       ${s.sternChaser? `<div class="ship-stat"><span class="ss-label">Stern</span><span class="ss-val">${s.sternChaser}</span></div>` : ''}
-      <div class="ship-stat"><span class="ss-label">SP</span><span class="ss-val">${s.spCurrent}/${s.spMax}</span></div>
+      <div class="ship-stat ship-stat-sp"><span class="ss-label">SP</span><div class="sp-adj-row"><button class="sp-adj-btn" onclick="adjSP('${id}',-1)">−</button><span class="ss-val">${s.spCurrent}/${s.spMax}</span><button class="sp-adj-btn" onclick="adjSP('${id}',1)">+</button></div></div>
       ${s.turnAngle  ? `<div class="ship-stat"><span class="ss-label">Turn</span><span class="ss-val ss-${(s.turnAngle||'').toLowerCase()}">${s.turnAngle}</span></div>` : ''}
       ${s.knots      ? `<div class="ship-stat"><span class="ss-label">Knots</span><span class="ss-val">${s.knots}</span></div>` : ''}
       ${s.breakValue ? `<div class="ship-stat"><span class="ss-label">Break</span><span class="ss-val">${s.breakValue}</span></div>` : ''}
@@ -1209,6 +1213,13 @@ window.openAddShip = function(playerId, faction) {
   openBuilder(playerId, faction);
 };
 
+
+window.adjSP = async function(id, delta) {
+  const s = (appData.ships || {})[id];
+  if (!s) return;
+  const newVal = Math.max(0, Math.min(s.spMax, (s.spCurrent || 0) + delta));
+  await update(ref(db, `/ships/${id}`), { spCurrent: newVal });
+};
 
 window.saveShip = async function(id) {
   const existing = (appData.ships || {})[id];
