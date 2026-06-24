@@ -365,12 +365,12 @@ async function connect(cfg) {
   try {
     const app = initializeApp(cfg);
     db = getDatabase(app);
-    // Check if data exists; if not, seed it
+    // Migrate first (moves root data into /campaigns/default/ if needed), then seed if still empty
+    await runMigrations();
     const snap = await get(cref('/'));
     if (!snap.exists()) {
       await set(cref('/'), { meta: { turn: 1, phase: 1 } });
     }
-    await runMigrations();
     // Subscribe to live updates
     onValue(cref('/'), (snapshot) => {
       appData = snapshot.val() || {};
@@ -386,27 +386,27 @@ async function connect(cfg) {
 async function runMigrations() {
   try {
     // v2: lift root-level data into /campaigns/default/ (one-time after namespacing refactor)
-    const v2Snap = await get(ref(db, '/migrations/v2_namespace'));
-    if (!v2Snap.exists()) {
-      const rootSnap = await get(ref(db, '/'));
-      const root = rootSnap.val() || {};
-      const keysToMigrate = ['ships', 'players', 'log', 'meta'];
-      const hasMigratable = keysToMigrate.some(k => root[k]);
-      if (hasMigratable) {
-        const updates = {};
-        for (const k of keysToMigrate) {
-          if (root[k]) updates[`/campaigns/default/${k}`] = root[k];
-        }
-        updates['/migrations/v2_namespace'] = true;
-        // clear old root keys
-        for (const k of keysToMigrate) {
-          if (root[k]) updates[`/${k}`] = null;
-        }
-        await update(ref(db, '/'), updates);
-        console.log('v2 migration: root data moved to /campaigns/default/');
-      } else {
-        await update(ref(db, '/'), { '/migrations/v2_namespace': true });
+    // Re-runs if flag is set but campaign still lacks players/ships (handles the bad-boot-order case)
+    const rootSnap = await get(ref(db, '/'));
+    const root = rootSnap.val() || {};
+    const keysToMigrate = ['ships', 'players', 'log', 'meta'];
+    const hasMigratable = keysToMigrate.some(k => root[k] && k !== 'migrations' && k !== 'campaigns');
+    const campaignSnap = await get(ref(db, '/campaigns/default'));
+    const campaignData = campaignSnap.val() || {};
+    const campaignIsEmpty = !campaignData.ships && !campaignData.players;
+    if (hasMigratable && campaignIsEmpty) {
+      const updates = {};
+      for (const k of keysToMigrate) {
+        if (root[k]) updates[`/campaigns/default/${k}`] = root[k];
       }
+      updates['/migrations/v2_namespace'] = true;
+      for (const k of keysToMigrate) {
+        if (root[k]) updates[`/${k}`] = null;
+      }
+      await update(ref(db, '/'), updates);
+      console.log('v2 migration: root data moved to /campaigns/default/');
+    } else if (!root.migrations?.v2_namespace) {
+      await update(ref(db, '/'), { '/migrations/v2_namespace': true });
     }
   } catch(e) { console.warn('Migration v2 failed:', e); }
 
