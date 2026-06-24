@@ -71,7 +71,10 @@
   .ship-list { display: flex; flex-direction: column; gap: 8px; }
   .ship-card { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
   .ship-card.repairing { border-left: 3px solid var(--accent2); }
-  .ship-card.lost { border-left: 3px solid var(--red); opacity: 0.65; }
+  .ship-card.sunk { border-left: 3px solid var(--red); opacity: 0.65; }
+  .ship-card.captured { border-left: 3px solid var(--green); }
+  .ship-card.sold { border-left: 3px solid var(--text-muted); opacity: 0.6; }
+  .pending-badge { display:inline-block; background: rgba(200,151,58,0.2); border: 1px solid var(--accent); color: var(--accent); border-radius: 4px; padding: 2px 8px; font-size: 0.72rem; margin-top: 6px; }
   .ship-card.merchant-card { border-left: 3px solid var(--merchant); }
   .ship-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
   .ship-name { font-size: 1rem; color: var(--text); }
@@ -246,6 +249,7 @@ let db, appData = {}, currentTab = 'overview', activeFilter = 'all';
 
 const FACTIONS = ['British','French','Spanish'];
 const FACTION_COLOR = { British:'var(--british)', French:'var(--french)', Spanish:'var(--spanish)', Merchant:'var(--merchant)' };
+const FACTION_FLAG = { British:'🇬🇧', French:'🇫🇷', Spanish:'🇪🇸', Merchant:'🚢' };
 const CREW_LEVELS = ['Inexperienced','Regular','Veteran'];
 const RANKS = ['Master and Commander','Post Captain'];
 const FAVOUR_LABELS = ['-2','-1','0','+1','+2'];
@@ -280,9 +284,9 @@ const SEED = {
     be6:  { player:'ethan',  faction:'British', name:'HMS Lapwing',      type:'10 Gun Schooner',   cost:56,  spCurrent:7,  spMax:13, location:'Zone 2', squadron:'B', officer:'', battlesWithoutStriking:2, crewLevel:'Regular',       repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
     be7:  { player:'ethan',  faction:'British', name:'HMS Sprightly',    type:'10 Gun Schooner',   cost:56,  spCurrent:2,  spMax:13, location:'Plymouth', squadron:'', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'Plymouth', repairCostPaid:21, availableIn:'Turn 4', notes:'', status:'repairing' },
     // British lost
-    bl1:  { player:'ethan',  faction:'British', name:'HMS Badger',       type:'10 Gun Brig',       cost:56,  spCurrent:0,  spMax:13, location:'Zone 2', squadron:'B', officer:'', battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured by Le Decide', status:'lost' },
-    bl2:  { player:'ethan',  faction:'British', name:'HMS Pickle',       type:'10 Gun Schooner',   cost:48,  spCurrent:2,  spMax:13, location:'Zone 2', squadron:'B', officer:'', battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured by Le Jupiter', status:'lost' },
-    bl3:  { player:'ethan',  faction:'British', name:'HMS Vigilant',     type:'18 Gun Brig',       cost:108, spCurrent:23, spMax:23, location:'Zone 3', squadron:'A', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Sunk by L\'Audacieux', status:'lost' },
+    bl1:  { player:'ethan',  faction:'British', name:'HMS Badger',       type:'10 Gun Brig',       cost:56,  spCurrent:0,  spMax:13, location:'Zone 2', squadron:'B', officer:'', battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured by Le Decide', status:'sunk' },
+    bl2:  { player:'ethan',  faction:'British', name:'HMS Pickle',       type:'10 Gun Schooner',   cost:48,  spCurrent:2,  spMax:13, location:'Zone 2', squadron:'B', officer:'', battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured by Le Jupiter', status:'sunk' },
+    bl3:  { player:'ethan',  faction:'British', name:'HMS Vigilant',     type:'18 Gun Brig',       cost:108, spCurrent:23, spMax:23, location:'Zone 3', squadron:'A', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Sunk by L\'Audacieux', status:'sunk' },
     // French – Dixie
     fd1:  { player:'dixieF', faction:'French', name:'Le Decide',         type:'18 Gun Brig',       cost:115, spCurrent:19, spMax:23, location:'Zone 2', squadron:'A', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured HMS Badger', status:'active' },
     fd2:  { player:'dixieF', faction:'French', name:'La Fouine',         type:'8 Gun Lugger',      cost:60,  spCurrent:10, spMax:10, location:'Zone 2', squadron:'A', officer:'', battlesWithoutStriking:3, crewLevel:'Regular',       repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
@@ -298,8 +302,8 @@ const SEED = {
     fd12: { player:'dixieF', faction:'French', name:'L\'Evielle',        type:'10 Gun Cutter',     cost:55,  spCurrent:13, spMax:13, location:'Rochefort', squadron:'', officer:'', battlesWithoutStriking:2, crewLevel:'Regular', repairPort:'Rochefort', repairCostPaid:7, availableIn:'Turn 5', notes:'', status:'repairing' },
     fd13: { player:'dixieF', faction:'French', name:'Le Furieux',        type:'16 Gun Brig',       cost:88,  spCurrent:10, spMax:20, location:'Rochefort', squadron:'', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'Rochefort', repairCostPaid:10, availableIn:'Turn 4', notes:'', status:'repairing' },
     // French lost
-    fl1:  { player:'dixieF', faction:'French', name:'L\'Alerte',         type:'10 Gun Schooner',   cost:56,  spCurrent:0,  spMax:13, location:'Zone 3', squadron:'B', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Sunk after collision with Le Furieux', status:'lost' },
-    fl2:  { player:'dixieF', faction:'French', name:'HMS Pickle',        type:'10 Gun Schooner',   cost:52,  spCurrent:2,  spMax:13, location:'Brest',  squadron:'', officer:'',  battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Paid off as Prize Money (52)', status:'lost' },
+    fl1:  { player:'dixieF', faction:'French', name:'L\'Alerte',         type:'10 Gun Schooner',   cost:56,  spCurrent:0,  spMax:13, location:'Zone 3', squadron:'B', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Sunk after collision with Le Furieux', status:'sunk' },
+    fl2:  { player:'dixieF', faction:'French', name:'HMS Pickle',        type:'10 Gun Schooner',   cost:52,  spCurrent:2,  spMax:13, location:'Brest',  squadron:'', officer:'',  battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Paid off as Prize Money (52)', status:'sunk' },
     // Spanish – Cal
     sc1:  { player:'cal', faction:'Spanish', name:'La Tormenta',         type:'26 Gun 6th Rate',   cost:120, spCurrent:33, spMax:33, location:'Zone 4', squadron:'C', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
     sc2:  { player:'cal', faction:'Spanish', name:'Sin Lombre',          type:'18 Gun Brig',       cost:80,  spCurrent:23, spMax:23, location:'Zone 4', squadron:'C', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
@@ -313,7 +317,7 @@ const SEED = {
     sc10: { player:'cal', faction:'Spanish', name:'Peruano',             type:'16 Gun Brig',       cost:72,  spCurrent:20, spMax:20, location:'Zone 3', squadron:'B', officer:'', battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
     sc11: { player:'cal', faction:'Spanish', name:'Resolucion',          type:'18 Gun Brig',       cost:80,  spCurrent:23, spMax:23, location:'Zone 3', squadron:'B', officer:'', battlesWithoutStriking:0, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
     // Spanish lost
-    sl1:  { player:'cal', faction:'Spanish', name:'El Vengador',         type:'16 Gun Brig',       cost:72,  spCurrent:1,  spMax:20, location:'Zone 7', squadron:'A', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured by HMS Lapwing', status:'lost' },
+    sl1:  { player:'cal', faction:'Spanish', name:'El Vengador',         type:'16 Gun Brig',       cost:72,  spCurrent:1,  spMax:20, location:'Zone 7', squadron:'A', officer:'', battlesWithoutStriking:1, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'Captured by HMS Lapwing', status:'sunk' },
     // Merchant Convoy
     mc1:  { player:'merchant', faction:'Merchant', name:'De Jonge Willem', type:'Whaler', cost:100, spCurrent:14, spMax:20, location:'Zone 3', squadron:'1', officer:'', battlesWithoutStriking:4, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
     mc2:  { player:'merchant', faction:'Merchant', name:'Noordster',       type:'Whaler', cost:100, spCurrent:20, spMax:20, location:'Zone 3', squadron:'1', officer:'', battlesWithoutStriking:4, crewLevel:'Inexperienced', repairPort:'', repairCostPaid:0, availableIn:'', notes:'', status:'active' },
@@ -336,6 +340,7 @@ async function connect(cfg) {
     if (!snap.exists()) {
       await set(ref(db, '/'), SEED);
     }
+    await runMigrations();
     // Subscribe to live updates
     onValue(ref(db, '/'), (snapshot) => {
       appData = snapshot.val() || {};
@@ -347,6 +352,30 @@ async function connect(cfg) {
     document.getElementById('loading').innerHTML = `<div style="color:var(--red);padding:20px;text-align:center">Firebase connection failed:<br>${e.message}<br><br><button class="btn" onclick="location.reload()">Retry</button></div>`;
   }
 }
+
+async function runMigrations() {
+  try {
+    const migSnap = await get(ref(db, '/migrations/v1_capture_links'));
+    if (migSnap.exists()) return;
+    // Patch known capture/sunk relationships from initial data
+    const patches = {
+      'ships/bl1': { status: 'sunk', capturedBy: 'fd1' },
+      'ships/bl2': { status: 'sunk', capturedBy: 'fd3' },
+      'ships/bl3': { status: 'sunk', sunkBy: 'fd5' },
+      'ships/fl1': { status: 'sunk', sunkBy: '__accident__' },
+      'ships/sl1': { status: 'sunk', capturedBy: 'bs9' },
+    };
+    const updates = {};
+    for (const [path, fields] of Object.entries(patches)) {
+      for (const [k, v] of Object.entries(fields)) {
+        updates[`${path}/${k}`] = v;
+      }
+    }
+    updates['migrations/v1_capture_links'] = true;
+    await update(ref(db, '/'), updates);
+  } catch(e) { console.warn('Migration failed:', e); }
+}
+
 
 window.saveConfig = function() {
   const cfg = {
@@ -395,9 +424,9 @@ function rebuildNav() {
   const players = Object.entries(appData.players || {});
   // Build player buttons
   const playerBtns = players.map(([pid, p]) => {
-    const dot = `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${FACTION_COLOR[p.faction]};margin-right:5px;vertical-align:middle"></span>`;
+    const flag = FACTION_FLAG[p.faction] || '';
     const active = currentTab === pid ? ' active' : '';
-    return `<button class="${active}" onclick="showTab('${pid}')">${dot}${p.name}</button>`;
+    return `<button class="${active}" onclick="showTab('${pid}')">${flag} ${p.name}</button>`;
   }).join('');
   nav.innerHTML = `
     <button class="${currentTab==='overview'?'active':''}" onclick="showTab('overview')">Overview</button>
@@ -411,22 +440,8 @@ function renderOverview() {
   const players = appData.players || {};
   const ships = appData.ships || {};
   let html = `<div class="card"><div class="card-title">Campaign Status</div>
-    <div class="stat-row">
-      <span class="stat-label">Game Turn</span>
-      <span style="display:flex;align-items:center;gap:8px">
-        <button class="res-adj" onclick="adjustTurn(-1)">−</button>
-        <span class="stat-value">${appData.meta.turn}</span>
-        <button class="res-adj" onclick="adjustTurn(1)">+</button>
-      </span>
-    </div>
-    <div class="stat-row">
-      <span class="stat-label">Phase</span>
-      <span style="display:flex;align-items:center;gap:8px">
-        <button class="res-adj" onclick="adjustPhase(-1)">−</button>
-        <span class="stat-value">${phaseLabel(appData.meta.phase)}</span>
-        <button class="res-adj" onclick="adjustPhase(1)">+</button>
-      </span>
-    </div>
+    <div class="stat-row"><span class="stat-label">Game Turn</span><span class="stat-value">${appData.meta.turn}</span></div>
+    <div class="stat-row"><span class="stat-label">Phase</span><span class="stat-value">${phaseLabel(appData.meta.phase)}</span></div>
   </div>`;
   html += `<div class="player-row">`;
   for (const [pid, p] of Object.entries(players)) {
@@ -442,15 +457,30 @@ function renderOverview() {
   }
   html += `</div>`;
   // Summary per faction
+  // Build a lookup: ship id → player faction, for resolving capturedBy
+  const factionByShipId = {};
+  for (const [sid, s] of Object.entries(ships)) {
+    const owner = players[s.player];
+    if (owner) factionByShipId[sid] = owner.faction;
+  }
+
   for (const faction of FACTIONS) {
     const fShips = Object.values(ships).filter(s => s.faction === faction);
-    const active = fShips.filter(s => s.status === 'active');
+    const active    = fShips.filter(s => s.status === 'active');
     const repairing = fShips.filter(s => s.status === 'repairing');
-    const lost = fShips.filter(s => s.status === 'lost');
+    const lost      = fShips.filter(s => ['sunk','sold'].includes(s.status));
+    // All ships captured BY this faction — capturedBy points to a ship belonging to this faction
+    const capturedByFaction = Object.values(ships).filter(s =>
+      s.capturedBy && factionByShipId[s.capturedBy] === faction
+    );
+    const fPlayers  = Object.entries(players).filter(([,p]) => p.faction === faction);
+    const playerList = fPlayers.map(([,p]) => `<span style="color:var(--text)">${p.name}</span> <span style="color:var(--text-muted);font-size:0.75rem">(${p.officerName})</span>`).join(', ');
     html += `<div class="card"><div class="card-title" style="color:${FACTION_COLOR[faction]}">${faction}</div>
+      ${fPlayers.length ? `<div class="stat-row"><span class="stat-label">Players</span><span class="stat-value" style="text-align:right">${playerList}</span></div>` : ''}
       <div class="stat-row"><span class="stat-label">Active</span><span class="stat-value">${active.length}</span></div>
       <div class="stat-row"><span class="stat-label">Repairing</span><span class="stat-value">${repairing.length}</span></div>
-      <div class="stat-row"><span class="stat-label">Lost/Captured</span><span class="stat-value">${lost.length}</span></div>
+      ${capturedByFaction.length ? `<div class="stat-row"><span class="stat-label">Captured</span><span class="stat-value" style="color:var(--green)">${capturedByFaction.length}</span></div>` : ''}
+      <div class="stat-row"><span class="stat-label">Lost</span><span class="stat-value" style="color:var(--red)">${lost.length}</span></div>
     </div>`;
   }
   return html;
@@ -485,19 +515,33 @@ function renderPlayer(pid) {
     </div>
   </div>`;
 
+  const allPShips = Object.entries(allShips).filter(([,s]) => s.player === pid);
+
+  const active    = allPShips.filter(([,s]) => s.status === 'active');
+  const repairing = allPShips.filter(([,s]) => s.status === 'repairing');
+  const pending   = allPShips.filter(([,s]) => s.status === 'captured' && !s.prizeResolution);
+  const captured  = allPShips.filter(([,s]) => s.status === 'captured' && s.prizeResolution);
+  const sunk      = allPShips.filter(([,s]) => s.status === 'sunk');
+
+  const filters = ['all','active','repairing','pending','captured','sunk'];
   html += `<div class="filter-bar">
-    ${['all','active','repairing','lost'].map(f => `<button class="filter-btn${activeFilter===f?' active':''}" onclick="setFilter('${f}')">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`).join('')}
+    ${filters.map(f => {
+      const label = f === 'pending' ? 'Pending' : f === 'captured' ? 'Captured' : f.charAt(0).toUpperCase()+f.slice(1);
+      const count = f === 'pending' ? pending.length : f === 'captured' ? captured.length : f === 'active' ? active.length : f === 'repairing' ? repairing.length : f === 'sunk' ? sunk.length : '';
+      const badge = (f !== 'all' && count > 0) ? ` <span style="background:rgba(255,255,255,0.15);border-radius:10px;padding:0 5px;font-size:0.7rem">${count}</span>` : '';
+      const highlight = f === 'pending' && pending.length > 0 ? ';border-color:var(--accent);color:var(--accent)' : '';
+      return `<button class="filter-btn${activeFilter===f?' active':''}" style="${highlight}" onclick="setFilter('${f}')">${label}${badge}</button>`;
+    }).join('')}
   </div>`;
 
   html += `<div class="ships-header"><div></div><button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button></div>`;
 
-  const pShips = Object.entries(allShips)
-    .filter(([,s]) => s.player === pid)
-    .filter(([,s]) => activeFilter === 'all' || s.status === activeFilter);
-
-  const active = pShips.filter(([,s]) => s.status === 'active');
-  const repairing = pShips.filter(([,s]) => s.status === 'repairing');
-  const lost = pShips.filter(([,s]) => s.status === 'lost');
+  const pShips = allPShips.filter(([,s]) => {
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'pending') return s.status === 'captured' && !s.prizeResolution;
+    if (activeFilter === 'captured') return s.status === 'captured' && s.prizeResolution;
+    return s.status === activeFilter;
+  });
 
   if (activeFilter === 'all' || activeFilter === 'active') {
     const bySquadron = {};
@@ -510,8 +554,14 @@ function renderPlayer(pid) {
   if ((activeFilter === 'all' || activeFilter === 'repairing') && repairing.length) {
     html += `<div class="section-label">In Repair</div><div class="ship-list">${repairing.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
   }
-  if ((activeFilter === 'all' || activeFilter === 'lost') && lost.length) {
-    html += `<div class="section-label">Lost / Captured</div><div class="ship-list">${lost.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+  if ((activeFilter === 'all' || activeFilter === 'pending') && pending.length) {
+    html += `<div class="section-label" style="color:var(--accent)">⏳ Pending Prize Decision</div><div class="ship-list">${pending.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+  }
+  if ((activeFilter === 'all' || activeFilter === 'captured') && captured.length) {
+    html += `<div class="section-label" style="color:var(--green)">Captured from Enemy</div><div class="ship-list">${captured.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+  }
+  if ((activeFilter === 'all' || activeFilter === 'sunk') && sunk.length) {
+    html += `<div class="section-label" style="color:var(--red)">Sunk</div><div class="ship-list">${sunk.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
   }
   if (!pShips.length) html += `<div class="empty-state">No ships to show.</div>`;
   return html;
@@ -543,7 +593,7 @@ function renderFaction(faction) {
 
   // Filter
   html += `<div class="filter-bar">
-    ${['all','active','repairing','lost'].map(f => `<button class="filter-btn${activeFilter===f?' active':''}" onclick="setFilter('${f}')">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`).join('')}
+    ${['all','active','repairing','sunk'].map(f => `<button class="filter-btn${activeFilter===f?' active':''}" onclick="setFilter('${f}')">${f.charAt(0).toUpperCase()+f.slice(1)}</button>`).join('')}
   </div>`;
 
   // Ships grouped by player
@@ -560,7 +610,7 @@ function renderFaction(faction) {
     // Group active ships by squadron
     const active = pShips.filter(([,s]) => s.status === 'active');
     const repairing = pShips.filter(([,s]) => s.status === 'repairing');
-    const lost = pShips.filter(([,s]) => s.status === 'lost');
+    const lost = pShips.filter(([,s]) => s.status === 'sunk');
 
     if (active.length || (activeFilter === 'all' && active.length === 0 && repairing.length === 0)) {
       if (activeFilter === 'all' || activeFilter === 'active') {
@@ -577,7 +627,7 @@ function renderFaction(faction) {
     if (activeFilter === 'all' || activeFilter === 'repairing') {
       if (repairing.length) { html += `<div class="section-label">In Repair</div><div class="ship-list">${repairing.map(([id,s]) => shipCard(id,s)).join('')}</div>`; }
     }
-    if (activeFilter === 'all' || activeFilter === 'lost') {
+    if (activeFilter === 'all' || activeFilter === 'sunk') {
       if (lost.length) { html += `<div class="section-label">Lost / Captured</div><div class="ship-list">${lost.map(([id,s]) => shipCard(id,s)).join('')}</div>`; }
     }
     if (!pShips.length) html += `<div class="empty-state">No ships to show.</div>`;
@@ -590,6 +640,33 @@ function shipCard(id, s) {
   const spClass = pct <= 0.25 ? 'critical' : pct <= 0.5 ? 'damaged' : '';
   const crewClass = s.crewLevel === 'Veteran' ? 'crew-vet' : s.crewLevel === 'Regular' ? 'crew-reg' : 'crew-inex';
   const barColor = pct > 0.6 ? 'var(--green)' : pct > 0.3 ? '#e8a44a' : 'var(--red)';
+  const allShips = appData.ships || {};
+
+  // Auto-generate capture/sunk relationship lines
+  let captureLines = '';
+  if (s.sunkBy) {
+    if (s.sunkBy === '__accident__') {
+      captureLines += `<div class="ship-notes" style="color:var(--red)">💥 Sunk — accident</div>`;
+    } else {
+      const sinker = allShips[s.sunkBy];
+      captureLines += `<div class="ship-notes" style="color:var(--red)">💥 Sunk by ${sinker ? sinker.name : s.sunkBy}</div>`;
+    }
+  }
+  // Show any ships this vessel has sunk
+  const sunkByMe = Object.entries(allShips).filter(([,ps]) => ps.sunkBy === id);
+  if (sunkByMe.length) {
+    captureLines += `<div class="ship-notes" style="color:var(--red)">💥 Sunk: ${sunkByMe.map(([,ps]) => ps.name).join(', ')}</div>`;
+  }
+  if (s.capturedBy) {
+    const captor = allShips[s.capturedBy];
+    captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captor ? captor.name : s.capturedBy}</div>`;
+  }
+  // Show any ships this vessel has captured
+  const prizes = Object.entries(allShips).filter(([,ps]) => ps.capturedBy === id);
+  if (prizes.length) {
+    captureLines += `<div class="ship-notes" style="color:var(--green)">🏆 Captured: ${prizes.map(([,ps]) => ps.name).join(', ')}</div>`;
+  }
+
   return `<div class="ship-card ${s.status}" id="sc-${id}">
     <div class="ship-top">
       <div>
@@ -603,14 +680,19 @@ function shipCard(id, s) {
     </div>
     <div class="ship-meta">
       <span class="tag sp ${spClass}">SP ${s.spCurrent}/${s.spMax}</span>
-      <span class="tag ${crewClass}">${s.crewLevel}</span>
+      <span class="tag ${crewClass}">${s.crewLevel} Crew</span>
       <span class="tag">${s.location}</span>
       ${s.battlesWithoutStriking > 0 ? `<span class="tag">${s.battlesWithoutStriking} battle${s.battlesWithoutStriking>1?'s':''}</span>` : ''}
       ${s.repairPort ? `<span class="tag" style="color:var(--accent2)">⚓ ${s.repairPort}</span>` : ''}
       ${s.availableIn ? `<span class="tag" style="color:var(--accent)">Avail. ${s.availableIn}</span>` : ''}
     </div>
     <div class="sp-bar-wrap"><div class="sp-bar" style="width:${Math.max(0,pct*100)}%;background:${barColor}"></div></div>
+    ${captureLines}
+    ${s.previousName ? `<div class="ship-notes" style="color:var(--text-muted)">Formerly: ${s.previousName}</div>` : ''}
     ${s.notes ? `<div class="ship-notes">${s.notes}</div>` : ''}
+    ${s.status === 'captured' && !s.prizeResolution ? `<div><span class="pending-badge">⏳ Pending Prize Decision</span> <button class="btn btn-sm" style="margin-left:8px;margin-top:6px" onclick="openResolvePrize('${id}')">Resolve</button></div>` : ''}
+    ${s.status === 'sold' ? `<div class="ship-notes" style="color:var(--text-muted)">💰 Sold for prize money (${s.cost} resources)</div>` : ''}
+    ${s.status === 'sunk' && s.sunkBy === '__lost_on_passage__' ? `<div class="ship-notes" style="color:var(--text-muted)">🌊 Lost on passage</div>` : ''}
   </div>`;
 }
 
@@ -726,10 +808,31 @@ window.savePlayer = async function(pid) {
 
 // ─── SHIP MODALS ──────────────────────────────────────────────────────────────
 const ZONES = ['Zone 1','Zone 2','Zone 3','Zone 4','Zone 5','Zone 6','Zone 7','Plymouth','Cork','Brest','Lorient','La Rochelle','Rochefort','Bayonne','Santander','Ferrol','Coruña','Vigo','Lisbon','Cádiz','Gibraltar'];
-const STATUSES = ['active','repairing','lost'];
+const STATUSES = ['active','repairing','sunk','captured','sold'];
+const FACTION_PORTS = {
+  British:  ['Plymouth','Cork','Gibraltar','Lisbon'],
+  French:   ['Brest','Lorient','La Rochelle','Rochefort','Bayonne'],
+  Spanish:  ['Santander','Ferrol','Coruña','Vigo','Cádiz'],
+  Merchant: ['Plymouth','Cork','Brest','Lorient','La Rochelle','Rochefort','Bayonne','Santander','Ferrol','Coruña','Vigo','Lisbon','Cádiz','Gibraltar'],
+};
 
 function shipFormHtml(s) {
   const players = Object.entries(appData.players || {});
+  const ownerPlayer = (appData.players || {})[s.player];
+
+  // Officers for this player (their named officer, if any)
+  const officerNames = ownerPlayer && ownerPlayer.officerName
+    ? [ownerPlayer.officerName]
+    : [];
+  const officerOpts = ['', ...officerNames]
+    .map(o => `<option value="${o}"${s.officer===o?' selected':''}>${o||'(none)'}</option>`).join('');
+
+  // Ports based on the owning player's faction (not the ship's stored faction, which may be stale)
+  const effectiveFaction = (ownerPlayer && ownerPlayer.faction) || s.faction;
+  const ports = FACTION_PORTS[effectiveFaction] || FACTION_PORTS.British;
+  const repairPortOpts = ['', ...ports]
+    .map(p => `<option value="${p}"${s.repairPort===p?' selected':''}>${p||'(none)'}</option>`).join('');
+
   return `
     <div class="form-row"><label>Ship Name</label><input id="sf-name" value="${s.name||''}"></div>
     <div class="form-grid">
@@ -749,12 +852,33 @@ function shipFormHtml(s) {
       <div class="form-row"><label>Status</label><select id="sf-status">${STATUSES.map(st=>`<option${s.status===st?' selected':''}>${st}</option>`).join('')}</select></div>
     </div>
     <div class="form-row"><label>Battles Without Striking</label><input type="number" id="sf-battles" value="${s.battlesWithoutStriking||0}" min="0"></div>
-    <div class="form-row"><label>Officer Assigned</label><input id="sf-officer" value="${s.officer||''}"></div>
+    <div class="form-row"><label>Officer Assigned</label><select id="sf-officer">${officerOpts}</select></div>
     <div class="form-grid">
-      <div class="form-row"><label>Repair Port</label><input id="sf-repairPort" value="${s.repairPort||''}"></div>
+      <div class="form-row"><label>Repair Port</label><select id="sf-repairPort">${repairPortOpts}</select></div>
       <div class="form-row"><label>Repair Cost Paid</label><input type="number" id="sf-repairCost" value="${s.repairCostPaid||0}"></div>
     </div>
     <div class="form-row"><label>Available in Turn</label><input id="sf-available" value="${s.availableIn||''}"></div>
+    <div class="form-row"><label>Sunk By</label><select id="sf-sunkBy">
+      <option value="">(none)</option>
+      <option value="__accident__"${s.sunkBy==='__accident__'?' selected':''}>Accident</option>
+      ${Object.entries(appData.ships||{})
+        .filter(([sid, ps]) => sid !== (s._id||'') && ps.player !== s.player && ps.status !== 'sunk')
+        .sort(([,a],[,b]) => a.name.localeCompare(b.name))
+        .map(([sid, ps]) => {
+          const owner = (appData.players||{})[ps.player];
+          return `<option value="${sid}"${s.sunkBy===sid?' selected':''}>${ps.name} (${owner?owner.name:ps.player})</option>`;
+        }).join('')}
+    </select></div>
+    <div class="form-row"><label>Captured By (enemy ship)</label><select id="sf-capturedBy">
+      <option value="">(none)</option>
+      ${Object.entries(appData.ships||{})
+        .filter(([sid, ps]) => sid !== (s._id||'') && ps.player !== s.player && ps.status !== 'sunk')
+        .sort(([,a],[,b]) => a.name.localeCompare(b.name))
+        .map(([sid, ps]) => {
+          const owner = (appData.players||{})[ps.player];
+          return `<option value="${sid}"${s.capturedBy===sid?' selected':''}>${ps.name} (${owner?owner.name:ps.player})</option>`;
+        }).join('')}
+    </select></div>
     <div class="form-row"><label>Transfer to Player</label><select id="sf-player">
       <option value="${s.player||''}">(current)</option>
       ${players.filter(([pid])=>pid!==(s.player||'')).map(([pid,p])=>`<option value="${pid}">${p.name} (${p.faction})</option>`).join('')}
@@ -779,6 +903,8 @@ function readShipForm(existing) {
     repairPort: document.getElementById('sf-repairPort').value.trim(),
     repairCostPaid: parseInt(document.getElementById('sf-repairCost').value)||0,
     availableIn: document.getElementById('sf-available').value.trim(),
+    sunkBy: document.getElementById('sf-sunkBy').value || '',
+    capturedBy: document.getElementById('sf-capturedBy').value || '',
     player: document.getElementById('sf-player').value || existing.player,
     notes: document.getElementById('sf-notes').value.trim(),
   };
@@ -811,8 +937,16 @@ window.openAddShip = function(playerId, faction) {
 window.saveShip = async function(id) {
   const existing = (appData.ships || {})[id];
   const data = readShipForm(existing);
+  // When transferred to a new player, clear squadron, set to captured/pending, update faction
+  if (data.player !== existing.player) {
+    data.squadron = '';
+    data.status = 'captured';
+    data.prizeResolution = '';
+    const newOwner = (appData.players || {})[data.player];
+    if (newOwner) data.faction = newOwner.faction;
+  }
   await set(ref(db, `/ships/${id}`), data);
-  closeModal(); showToast('Ship updated');
+  closeModal(); showToast(data.player !== existing.player ? 'Ship transferred — pending prize decision' : 'Ship updated');
 };
 
 window.addShip = async function(playerId, faction) {
@@ -829,6 +963,74 @@ window.deleteShip = async function(id) {
   if (!confirm(`Delete ${s?.name}? This cannot be undone.`)) return;
   await remove(ref(db, `/ships/${id}`));
   closeModal(); showToast('Ship removed');
+};
+
+// ─── PRIZE RESOLUTION ────────────────────────────────────────────────────────
+window.openResolvePrize = function(id) {
+  const s = (appData.ships || {})[id];
+  if (!s) return;
+  const owner = (appData.players || {})[s.player];
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Resolve Prize: ${s.name}</h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px">Value: <strong style="color:var(--accent)">${s.cost} resources</strong> · Owner: ${owner ? owner.name : s.player}</p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn btn-ghost" style="text-align:left;padding:12px" onclick="resolveLostOnPassage('${id}')">
+        <div style="font-weight:bold;color:var(--red)">🌊 Lost on Passage</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px">Ship lost en route to port — no benefit gained</div>
+      </button>
+      <button class="btn btn-ghost" style="text-align:left;padding:12px" onclick="resolvePrizeMoney('${id}')">
+        <div style="font-weight:bold;color:var(--accent)">💰 Prize Money</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px">Sell for ${s.cost} resources — added to ${owner ? owner.name : 'player'}'s total</div>
+      </button>
+      <button class="btn btn-ghost" style="text-align:left;padding:12px" onclick="openPurchasedByAdmiralty('${id}')">
+        <div style="font-weight:bold;color:var(--green)">⚓ Purchased by Admiralty</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:3px">Add to roster as active ship with Inexperienced crew</div>
+      </button>
+    </div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>`);
+};
+
+window.resolveLostOnPassage = async function(id) {
+  await update(ref(db, `/ships/${id}`), { status: 'sunk', sunkBy: '__lost_on_passage__', prizeResolution: 'lost_on_passage' });
+  closeModal(); showToast('Ship lost on passage');
+};
+
+window.resolvePrizeMoney = async function(id) {
+  const s = (appData.ships || {})[id];
+  const player = (appData.players || {})[s.player];
+  const newResources = (player ? player.resources : 0) + (s.cost || 0);
+  const updates = {};
+  updates[`/ships/${id}/status`] = 'sold';
+  updates[`/ships/${id}/prizeResolution`] = 'prize_money';
+  updates[`/players/${s.player}/resources`] = newResources;
+  await update(ref(db, '/'), updates);
+  closeModal(); showToast(`${s.cost} resources added — ship sold`);
+};
+
+window.openPurchasedByAdmiralty = function(id) {
+  const s = (appData.ships || {})[id];
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Purchased by Admiralty</h2>
+    <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:16px">The ship will be added to the roster with an Inexperienced crew. You may rename it.</p>
+    <div class="form-row"><label>Ship Name</label><input id="pr-name" value="${s.name}"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="resolvePurchasedByAdmiralty('${id}')">Add to Roster</button>
+    </div>`);
+};
+
+window.resolvePurchasedByAdmiralty = async function(id) {
+  const s = (appData.ships || {})[id];
+  const newName = document.getElementById('pr-name').value.trim() || s.name;
+  const renamed = newName !== s.name;
+  await update(ref(db, `/ships/${id}`), {
+    status: 'active',
+    crewLevel: 'Inexperienced',
+    prizeResolution: 'purchased',
+    name: newName,
+    previousName: renamed ? s.name : (s.previousName || ''),
+  });
+  closeModal(); showToast(`${newName} added to roster`);
 };
 
 // ─── LOG MODAL ────────────────────────────────────────────────────────────────
