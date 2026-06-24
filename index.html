@@ -154,45 +154,7 @@
 
   .empty-state { text-align: center; padding: 32px; color: var(--text-muted); font-size: 0.9rem; }
 
-  /* Ship stats row */
-  .ship-stats { display:flex; flex-wrap:wrap; gap:0; margin-top:8px; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
-  .ship-stat { flex:1; min-width:44px; padding:4px 6px; text-align:center; border-right:1px solid var(--border); }
-  .ship-stat:last-child { border-right:none; }
-  .ship-stat-sp { min-width:70px; }
-  .sp-adj-row { display:flex; align-items:center; justify-content:center; gap:4px; }
-  .sp-adj-btn { background:var(--surface); border:1px solid var(--border); color:var(--text-muted); border-radius:3px; width:18px; height:18px; font-size:0.75rem; cursor:pointer; line-height:1; display:flex; align-items:center; justify-content:center; padding:0; flex-shrink:0; }
-  .sp-adj-btn:hover { border-color:var(--accent); color:var(--accent); }
-    .ship-stat .ss-label { font-size:0.62rem; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); display:block; }
-  .ship-stat .ss-val { font-size:0.82rem; font-weight:bold; color:var(--text); display:block; }
-  .ss-red { color:var(--red) !important; }
-  .ss-yellow { color:var(--accent) !important; }
-  .ss-green { color:var(--green) !important; }
-
-    /* Battle reports */
-  .report-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
-  .letter-box { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; font-size:0.85rem; line-height:1.8; white-space:pre-wrap; color:var(--text); font-style:italic; margin-top:8px; }
-  .letter-collapsed { max-height:80px; overflow:hidden; position:relative; }
-  .letter-collapsed::after { content:''; position:absolute; bottom:0; left:0; right:0; height:40px; background:linear-gradient(transparent,var(--surface2)); }
-  .report-expand { background:none; border:none; color:var(--accent2); font-size:0.78rem; cursor:pointer; padding:4px 0; margin-top:4px; font-family:var(--font); }
-  .player-check-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
-  .player-check { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:6px 10px; font-size:0.85rem; cursor:pointer; }
-  .player-check input[type=checkbox] { accent-color:var(--accent); width:14px; height:14px; flex-shrink:0; }
-
-    /* Battle reports */
-  .report-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; }
-  .report-head { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
-  .report-meta { font-size:0.75rem; color:var(--text-muted); line-height:1.6; }
-  .report-participants { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  .report-tag { background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:2px 8px; font-size:0.75rem; }
-  .letter-box { background:var(--surface2); border:1px solid var(--border); border-radius:var(--radius); padding:16px 20px; font-size:0.85rem; line-height:1.8; white-space:pre-wrap; color:var(--text); font-style:italic; margin-top:8px; }
-  .letter-collapsed { max-height:80px; overflow:hidden; position:relative; }
-  .letter-collapsed::after { content:''; position:absolute; bottom:0; left:0; right:0; height:40px; background:linear-gradient(transparent,var(--surface2)); }
-  .report-expand { background:none; border:none; color:var(--accent2); font-size:0.78rem; cursor:pointer; padding:4px 0; margin-top:4px; font-family:var(--font); }
-  .player-check-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
-  .player-check { display:flex; align-items:center; gap:8px; background:var(--surface2); border:1px solid var(--border); border-radius:4px; padding:6px 10px; font-size:0.85rem; cursor:pointer; }
-  .player-check input[type=checkbox] { accent-color:var(--accent); width:14px; height:14px; flex-shrink:0; }
-
-    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--accent); color: var(--text); padding: 10px 20px; border-radius: var(--radius); z-index: 500; font-size: 0.88rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--surface2); border: 1px solid var(--accent); color: var(--text); padding: 10px 20px; border-radius: var(--radius); z-index: 500; font-size: 0.88rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
   .toast.show { opacity: 1; }
 
   /* Ship builder overlay */
@@ -281,13 +243,12 @@
     <div id="bldr-decks"></div>
     <button class="btn btn-ghost btn-sm" onclick="builderAddDeck()" style="margin-top:4px">+ Add Gun Deck</button>
 
+    <div class="section-label" style="margin-top:14px">Upgrades</div>
+    <div class="upgrade-grid" id="bldr-upgrades"></div>
 
     <div class="preview-bar" id="bldr-preview">
       <div class="preview-stat">SP: <span id="prev-sp">—</span></div>
       <div class="preview-stat">Broadsides: <span id="prev-broad">—</span></div>
-      <div class="preview-stat">Knots: <span id="prev-knots">—</span></div>
-      <div class="preview-stat">Turn: <span id="prev-turn">—</span></div>
-      <div class="preview-stat">Break: <span id="prev-break">—</span></div>
       <div class="preview-stat">Cost: <span id="prev-cost">—</span> pts</div>
     </div>
 
@@ -318,9 +279,7 @@ import { getDatabase, ref, set, get, update, remove, onValue, push } from "https
 
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 // Pre-fill your Firebase config here to skip the setup screen for all players:
-  const OPENAI_API_KEY = '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';
-
-const firebaseConfig = {
+  const firebaseConfig = {
 
     apiKey: "AIzaSyCqJhwyq_Sxwx8mn7IFTMmIHk15vmrJehY",
 
@@ -422,7 +381,7 @@ const SEED = {
 };
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
-async async function boot() {
+async function boot() {
   await connect(firebaseConfig);
 }
 
@@ -444,11 +403,7 @@ async function connect(cfg) {
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
   } catch(e) {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('setup-screen').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('app').innerHTML = `<div style="color:var(--red);padding:40px;text-align:center;font-size:1rem">Firebase connection failed:<br><br><strong>${e.message}</strong><br><br><button class="btn" onclick="location.reload()">Retry</button></div>`;
-    console.error('Firebase boot error:', e);
+    document.getElementById('loading').innerHTML = `<div style="color:var(--red);padding:20px;text-align:center">Firebase connection failed:<br>${e.message}<br><br><button class="btn" onclick="location.reload()">Retry</button></div>`;
   }
 }
 
@@ -663,27 +618,7 @@ function renderPlayer(pid) {
     html += `<div class="section-label" style="color:var(--red)">Sunk</div><div class="ship-list">${sunk.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
   }
   if (!pShips.length) html += `<div class="empty-state">No ships to show.</div>`;
-
-  // Battle reports involving this player
-  const allLog = appData.log || {};
-  const playerReports = Object.entries(allLog).filter(([,e]) =>
-    e.reporter === pid || (e.opponents||[]).includes(pid)
-  ).sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
-  if (playerReports.length) {
-    html += `<div class="section-label" style="margin-top:20px">Battle Dispatches</div>`;
-    html += playerReports.slice(0,5).map(([id,e]) => _reportCardHtml(id, e)).join('');
-  }
-
-  // Battle reports involving this player
-  const allLog = appData.log || {};
-  const playerReports = Object.entries(allLog).filter(([,e]) =>
-    e.reporter === pid || (e.opponents||[]).includes(pid)
-  ).sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
-  if (playerReports.length) {
-    html += `<div class="section-label" style="margin-top:20px">Battle Dispatches</div>`;
-    html += playerReports.slice(0,5).map(([id,e]) => _reportCardHtml(id, e)).join('');
-  }
-    return html;
+  return html;
 }
 
 function phaseLabel(p) {
@@ -797,17 +732,8 @@ function shipCard(id, s) {
         <button class="btn btn-sm btn-ghost" onclick="openEditShip('${id}')">Edit</button>
       </div>
     </div>
-    <div class="ship-stats">
-      ${s.size       ? `<div class="ship-stat"><span class="ss-label">Size</span><span class="ss-val">${s.size}</span></div>` : ''}
-      ${s.bowChaser  ? `<div class="ship-stat"><span class="ss-label">Bow</span><span class="ss-val">${s.bowChaser}</span></div>` : ''}
-      ${s.broadsides ? `<div class="ship-stat"><span class="ss-label">Broadsides</span><span class="ss-val">${s.broadsides}</span></div>` : ''}
-      ${s.sternChaser? `<div class="ship-stat"><span class="ss-label">Stern</span><span class="ss-val">${s.sternChaser}</span></div>` : ''}
-      <div class="ship-stat ship-stat-sp"><span class="ss-label">SP</span><div class="sp-adj-row"><button class="sp-adj-btn" onclick="adjSP('${id}',-1)">−</button><span class="ss-val${s.breakValue && s.spCurrent < s.breakValue ? ' ss-red' : ''}">${s.spCurrent}/${s.spMax}</span><button class="sp-adj-btn" onclick="adjSP('${id}',1)">+</button></div></div>
-      ${s.turnAngle  ? `<div class="ship-stat"><span class="ss-label">Turn</span><span class="ss-val ss-${(s.turnAngle||'').toLowerCase()}">${s.turnAngle}</span></div>` : ''}
-      ${s.knots      ? `<div class="ship-stat"><span class="ss-label">Knots</span><span class="ss-val">${s.knots}</span></div>` : ''}
-      ${s.breakValue ? `<div class="ship-stat"><span class="ss-label">Break</span><span class="ss-val">${s.breakValue}</span></div>` : ''}
-    </div>
-        <div class="ship-meta">
+    <div class="ship-meta">
+      <span class="tag sp ${spClass}">SP ${s.spCurrent}/${s.spMax}</span>
       <span class="tag ${crewClass}">${s.crewLevel} Crew</span>
       <span class="tag">${s.location}</span>
       ${s.battlesWithoutStriking > 0 ? `<span class="tag">${s.battlesWithoutStriking} battle${s.battlesWithoutStriking>1?'s':''}</span>` : ''}
@@ -837,34 +763,15 @@ function renderMerchant() {
 }
 
 // ─── LOG ──────────────────────────────────────────────────────────────────────
-function _reportCardHtml(id, e) {
-  const players = appData.players || {};
-  const rp = players[e.reporter] || {};
-  const opponents = (e.opponents || []).map(oid => {
-    const p = players[oid];
-    return p ? `${FACTION_FLAG[p.faction]||''} ${p.officerName}` : oid;
-  }).join(', ');
-  const repTag = `${FACTION_FLAG[rp.faction]||''} ${rp.officerName||e.reporter}`;
-  const sqNote = e.squadron ? ` · Sqn ${e.squadron}` : '';
-  const date = e.timestamp ? new Date(e.timestamp).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : '';
-  return `<div class="report-card">
-    <div class="report-head">
-      <div>
-        <div style="font-size:0.9rem;font-weight:bold;color:var(--accent)">Turn ${e.turn}, Phase ${e.phase} — Action Report</div>
-        <div class="report-meta">${repTag}${sqNote}${opponents?' vs '+opponents:''} ${date?'· '+date:''}</div>
-      </div>
-    </div>
-    <div class="letter-box letter-collapsed" id="letter-${id}">${e.letter||e.text||'(no content)'}</div>
-    <button class="report-expand" id="ltoggle-${id}" onclick="toggleLetter('${id}')">Read full dispatch ▾</button>
-  </div>`;
-}
-
 function renderLog() {
   const log = appData.log || {};
-  const entries = Object.entries(log).sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
-  let html = `<div class="ships-header"><div>Campaign Log</div><button class="btn btn-sm" onclick="openAddLog()">+ Battle Report</button></div>`;
-  if (!entries.length) html += `<div class="empty-state">No reports logged yet.</div>`;
-  else html += entries.map(([id,e]) => _reportCardHtml(id, e)).join('');
+  const entries = Object.entries(log).sort(([a],[b]) => b.localeCompare(a));
+  let html = `<div class="ships-header"><div>Campaign Log</div><button class="btn btn-sm" onclick="openAddLog()">+ Add Entry</button></div>`;
+  if (!entries.length) html += `<div class="empty-state">No log entries yet.</div>`;
+  else html += entries.map(([id,e]) => `<div class="card" style="margin-bottom:8px">
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px">Turn ${e.turn} · ${e.faction || ''} · ${e.timestamp||''}</div>
+    <div style="font-size:0.9rem">${e.text}</div>
+  </div>`).join('');
   return html;
 }
 
@@ -1005,24 +912,6 @@ function shipFormHtml(s) {
       <div class="form-row"><label>Repair Cost Paid</label><input type="number" id="sf-repairCost" value="${s.repairCostPaid||0}"></div>
     </div>
     <div class="form-row"><label>Available in Turn</label><input id="sf-available" value="${s.availableIn||''}"></div>
-    <div class="section-label" style="margin-top:8px">Combat Stats <span style="font-size:0.7rem;color:var(--text-muted);text-transform:none">(auto-filled by builder)</span></div>
-    <div class="form-grid">
-      <div class="form-row"><label>Size</label><select id="sf-size">
-        ${['','XL','L','M','S','T'].map(v=>`<option value="${v}"${s.size===v?' selected':''}>${v||'—'}</option>`).join('')}
-      </select></div>
-      <div class="form-row"><label>Turn Angle</label><select id="sf-turn">
-        ${['','Red','Yellow','Green'].map(v=>`<option value="${v}"${s.turnAngle===v?' selected':''}>${v||'—'}</option>`).join('')}
-      </select></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Knots</label><input type="number" id="sf-knots" value="${s.knots||''}" min="1" max="10"></div>
-      <div class="form-row"><label>Break Value</label><input type="number" id="sf-break" value="${s.breakValue||''}" min="1"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Broadsides</label><input id="sf-broadsides" value="${s.broadsides||''}" placeholder="e.g. 3M-2L"></div>
-      <div class="form-row"><label>Stern Chaser</label><input id="sf-stern" value="${s.sternChaser||''}" placeholder="e.g. 1L or -"></div>
-    </div>
-    <div class="form-row"><label>Bow Chaser</label><input id="sf-bow" value="${s.bowChaser||''}" placeholder="e.g. 1L or -"></div>
     <div class="form-row"><label>Sunk By</label><select id="sf-sunkBy">
       <option value="">(none)</option>
       <option value="__accident__"${s.sunkBy==='__accident__'?' selected':''}>Accident</option>
@@ -1072,13 +961,6 @@ function readShipForm(existing) {
     capturedBy: document.getElementById('sf-capturedBy').value || '',
     player: document.getElementById('sf-player').value || existing.player,
     notes: document.getElementById('sf-notes').value.trim(),
-    size:        document.getElementById('sf-size').value||undefined,
-    turnAngle:   document.getElementById('sf-turn').value||undefined,
-    knots:       parseInt(document.getElementById('sf-knots').value)||undefined,
-    breakValue:  parseInt(document.getElementById('sf-break').value)||undefined,
-    broadsides:  document.getElementById('sf-broadsides').value.trim()||undefined,
-    sternChaser: document.getElementById('sf-stern').value.trim()||undefined,
-    bowChaser:   document.getElementById('sf-bow').value.trim()||undefined,
   };
 }
 
@@ -1096,10 +978,18 @@ window.openEditShip = function(id) {
 };
 
 // ─── SHIP BUILDER ─────────────────────────────────────────────────────────────
+const BUILDER_UPGRADES = [
+  { id:'sturdy',         name:'Sturdy',         cost:{XL:120,L:80,M:50,S:30,T:15}, excludes:[] },
+  { id:'over_gunned',    name:'Over Gunned',     cost:{XL:80,L:65,M:45,S:0,T:0},   excludes:['carronade_refit'], sizes:['XL','L','M'] },
+  { id:'master_gunner',  name:'Master Gunner',   cost:{XL:150,L:120,M:80,S:50,T:30},excludes:[] },
+  { id:'marines',        name:'Marines',         cost:{XL:60,L:45,M:30,S:20,T:10}, excludes:['privateer'] },
+  { id:'privateer',      name:'Privateer',       cost:{XL:0,L:40,M:30,S:20,T:10},  excludes:['marines'], sizes:['L','M','S','T'] },
+  { id:'carronade_refit',name:'Carronade Refit', cost:{XL:80,L:65,M:45,S:30,T:20}, excludes:['over_gunned'] },
+];
 const CALIBERS = [4,6,9,12,18,24,32,36,42];
 let _bldrDecks = [];
 let _bldrDeckId = 3;
-let _bldrPlayer = null, _bldrFaction = null;
+let _bldrPlayer = null, _bldrFaction = null, _bldrUpgrades = [];
 
 function _bSize(type) {
   const t = type.toLowerCase();
@@ -1134,71 +1024,56 @@ function _bBroadsides(decks) {
 function _bChasers(decks) {
   const vals={H:15,M:10,L:5,HC:20,C:15,LC:5};
   let total=0;
-  for (const side of ['bow','stern']) {
+  const sides=['bow','stern'];
+  for (const side of sides) {
     let guns=0,cal=9,t='long';
     for (const d of decks) { if(d.name.toLowerCase().includes(side)){guns+=d.guns;cal=d.caliber;t=d.type;} }
     if(guns>0){ const dice=Math.max(1,Math.round(guns/2/5)); total+=dice*(vals[_bCat(cal,t)]||5); }
   }
   return total;
 }
-function _bChaserStr(decks, side) {
-  let guns=0,cal=9,t='long';
-  for (const d of decks) { if(d.name.toLowerCase().includes(side)){guns+=d.guns;cal=d.caliber;t=d.type;} }
-  if(!guns) return '-';
-  const dice=Math.max(1,Math.round(guns/2/5));
-  return dice+_bCat(cal,t);
-}
-function _bTurn(type) {
-  const t=type.toLowerCase();
-  if(t.includes('1st rate')||t.includes('2nd rate')||t.includes('merchantman')||t.includes('east indiaman')||t.includes('manila galleon')) return 'Yellow';
-  if(t.includes('galley')||t.includes('galiot')||t.includes('gunboat')||t.includes('felucca')) return 'Green';
-  return 'Red';
-}
-function _bKnots(type, fast) {
-  const t=type.toLowerCase();
-  let base=5;
-  if(t.includes('1st rate')||t.includes('2nd rate')) base=3;
-  else if(t.includes('3rd rate')||t.includes('4th rate')) base=4;
-  else if(t.includes('cutter')||t.includes('schooner')||t.includes('felucca')) base=6;
-  return base+(fast?1:0);
-}
-function _bBreak(sp, type) {
-  const t=type.toLowerCase();
-  let div=4.5;
-  if(t.includes('1st rate')||t.includes('2nd rate')||t.includes('3rd rate')) div=3.5;
-  else if(t.includes('4th rate')||t.includes('5th rate')||t.includes('heavy frigate')||t.includes('razee')||t.includes('frigate')) div=4;
-  return Math.ceil(sp/div);
-}
 function _round5(n) { return Math.round(n/5)*5; }
 
 function builderCalc() {
-  const guns       = parseInt(document.getElementById('bldr-guns').value)||0;
-  const type       = document.getElementById('bldr-type').value||'';
-  const crew       = document.getElementById('bldr-crew').value;
-  const fastSailer = document.getElementById('bldr-fastsailer').checked;
-  const swivels    = document.getElementById('bldr-swivels').checked;
+  const guns        = parseInt(document.getElementById('bldr-guns').value)||0;
+  const type        = document.getElementById('bldr-type').value||'';
+  const crew        = document.getElementById('bldr-crew').value;
+  const fastSailer  = document.getElementById('bldr-fastsailer').checked;
+  const swivels     = document.getElementById('bldr-swivels').checked;
+  const size        = _bSize(type);
 
-  const sp    = Math.round(guns*1.25);
+  const sp = Math.round(guns*1.25);
   const parts = _bBroadsides(_bldrDecks);
+
+  // Base cost: SP*4 + broadsides + chasers
   let base = sp*4;
   for (const p of parts) base += p.dice*p.val;
   base += _bChasers(_bldrDecks);
-  if (swivels)    base += 15;
-  if (fastSailer) base = Math.round(base*1.12);
-  base = _round5(base);
-  const crewMod = {Inexperienced:-0.20,Regular:0,Veteran:0.20};
-  const cost  = Math.round(base*(1+(crewMod[crew]||0)));
-  const broad = parts.length ? parts.map(p=>p.dice+p.cat).join('-') : '—';
-  const knots = _bKnots(type, fastSailer);
-  const turn  = _bTurn(type);
-  const brk   = _bBreak(sp, type);
 
+  // Swivel guns flat cost
+  if (swivels) base += 15;
+
+  // Fast Sailer: +12% of base
+  if (fastSailer) base = Math.round(base * 1.12);
+
+  // Round to nearest 5
+  base = _round5(base);
+
+  // Crew modifier
+  const crewMod = {Inexperienced:-0.20,Regular:0,Veteran:0.20};
+  let cost = Math.round(base*(1+(crewMod[crew]||0)));
+
+  // Upgrades (added after crew modifier)
+  for (const uid of _bldrUpgrades) {
+    const u = BUILDER_UPGRADES.find(x=>x.id===uid);
+    if (u) cost += (u.cost[size]||0);
+  }
+
+  const broadStr = parts.length ? parts.map(p=>p.dice+p.cat).join('-') : '—';
   document.getElementById('prev-sp').textContent    = sp;
-  document.getElementById('prev-broad').textContent = broad;
-  document.getElementById('prev-knots').textContent = knots;
-  document.getElementById('prev-turn').textContent  = turn;
-  document.getElementById('prev-break').textContent = brk;
+  document.getElementById('prev-broad').textContent = broadStr;
   document.getElementById('prev-cost').textContent  = cost;
+  _renderUpgrades(size);
 }
 
 function _renderDecks() {
@@ -1215,35 +1090,54 @@ function _renderDecks() {
     </div>`).join('');
 }
 
+function _renderUpgrades(size) {
+  document.getElementById('bldr-upgrades').innerHTML = BUILDER_UPGRADES.map(u => {
+    const allowed  = !u.sizes || u.sizes.includes(size);
+    const cost     = u.cost[size]||0;
+    const excluded = !_bldrUpgrades.includes(u.id) && u.excludes.some(id=>_bldrUpgrades.includes(id));
+    const checked  = _bldrUpgrades.includes(u.id);
+    const disabled = !allowed || excluded;
+    return `<label class="upgrade-item${disabled?' disabled':''}">
+      <input type="checkbox" ${checked?'checked':''} ${disabled?'disabled':''} onchange="builderToggleUpgrade('${u.id}',this.checked)">
+      <span>${u.name}</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:auto">+${cost}</span>
+    </label>`;
+  }).join('');
+}
+
 window.builderDeckUpdate = function(id, field, val) {
-  const d=_bldrDecks.find(x=>x.id===id); if(d) d[field]=val; builderCalc();
+  const d = _bldrDecks.find(x=>x.id===id); if(d) d[field]=val; builderCalc();
 };
 window.builderRemoveDeck = function(id) {
-  if(_bldrDecks.length<=1) return;
-  _bldrDecks=_bldrDecks.filter(d=>d.id!==id);
+  if (_bldrDecks.length<=1) return;
+  _bldrDecks = _bldrDecks.filter(d=>d.id!==id);
   _renderDecks(); builderCalc();
 };
 window.builderAddDeck = function() {
   _bldrDecks.push({id:_bldrDeckId++,name:'',guns:10,caliber:9,type:'long'});
   _renderDecks(); builderCalc();
 };
-window.closeBuilder = function() { document.getElementById('builder-overlay').style.display='none'; };
+window.builderToggleUpgrade = function(id, on) {
+  if (on) _bldrUpgrades.push(id);
+  else _bldrUpgrades = _bldrUpgrades.filter(x=>x!==id);
+  builderCalc();
+};
+window.closeBuilder  = function() { document.getElementById('builder-overlay').style.display='none'; };
 window.builderOverlayClick = function(e) { if(e.target===document.getElementById('builder-overlay')) closeBuilder(); };
 
 function openBuilder(playerId, faction) {
-  _bldrPlayer=playerId; _bldrFaction=faction;
-  _bldrDecks=[{id:1,name:'Main Deck',guns:26,caliber:18,type:'long'},{id:2,name:'QD/FC',guns:10,caliber:9,type:'long'}];
-  _bldrDeckId=3;
-  const sel=document.getElementById('bldr-type');
-  sel.innerHTML=SHIP_TYPES.map(t=>`<option>${t}</option>`).join('');
-  sel.value='5th Rate Frigate';
-  document.getElementById('bldr-name').value='';
-  document.getElementById('bldr-guns').value=36;
-  document.getElementById('bldr-crew').value='Regular';
-  document.getElementById('bldr-fastsailer').checked=false;
-  document.getElementById('bldr-swivels').checked=false;
+  _bldrPlayer = playerId; _bldrFaction = faction;
+  _bldrDecks = [{id:1,name:'Main Deck',guns:26,caliber:18,type:'long'},{id:2,name:'QD/FC',guns:10,caliber:9,type:'long'}];
+  _bldrDeckId = 3; _bldrUpgrades = [];
+  const sel = document.getElementById('bldr-type');
+  sel.innerHTML = SHIP_TYPES.map(t=>`<option>${t}</option>`).join('');
+  sel.value = '5th Rate Frigate';
+  document.getElementById('bldr-name').value = '';
+  document.getElementById('bldr-guns').value = 36;
+  document.getElementById('bldr-crew').value = 'Regular';
+  document.getElementById('bldr-fastsailer').checked = false;
+  document.getElementById('bldr-swivels').checked    = false;
   _renderDecks(); builderCalc();
-  document.getElementById('builder-overlay').style.display='flex';
+  document.getElementById('builder-overlay').style.display = 'flex';
 }
 
 window.builderCreateShip = function() {
@@ -1255,18 +1149,13 @@ window.builderCreateShip = function() {
   const broad = document.getElementById('prev-broad').textContent;
   const fast  = document.getElementById('bldr-fastsailer').checked;
   const swiv  = document.getElementById('bldr-swivels').checked;
-  const knots = parseInt(document.getElementById('prev-knots').textContent)||undefined;
-  const turn  = document.getElementById('prev-turn').textContent;
-  const brk   = parseInt(document.getElementById('prev-break').textContent)||undefined;
-  const size  = _bSize(type);
-  const stern = _bChaserStr(_bldrDecks,'stern');
-  const bow   = _bChaserStr(_bldrDecks,'bow');
-  const noteParts=[];
-  if(fast) noteParts.push('Fast Sailer');
-  if(swiv) noteParts.push('Swivel Guns');
+  const upgStr = _bldrUpgrades.join(', ');
+  const noteParts = [`Broadsides: ${broad}`];
+  if (fast) noteParts.push('Fast Sailer');
+  if (swiv) noteParts.push('Swivel Guns');
+  if (upgStr) noteParts.push(upgStr);
   closeBuilder();
   const blank = { player:_bldrPlayer, faction:_bldrFaction, name, type, cost, spCurrent:sp, spMax:sp,
-    size, broadsides:broad, sternChaser:stern, bowChaser:bow, turnAngle:turn, knots, breakValue:brk,
     location:'', squadron:'', crewLevel:crew, status:'active', battlesWithoutStriking:0,
     officer:'', repairPort:'', repairCostPaid:0, availableIn:'', notes:noteParts.join(' · ') };
   showModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
@@ -1282,13 +1171,6 @@ window.openAddShip = function(playerId, faction) {
   openBuilder(playerId, faction);
 };
 
-
-window.adjSP = async function(id, delta) {
-  const s = (appData.ships || {})[id];
-  if (!s) return;
-  const newVal = Math.max(0, Math.min(s.spMax, (s.spCurrent || 0) + delta));
-  await update(ref(db, `/ships/${id}`), { spCurrent: newVal });
-};
 
 window.saveShip = async function(id) {
   const existing = (appData.ships || {})[id];
@@ -1389,220 +1271,19 @@ window.resolvePurchasedByAdmiralty = async function(id) {
   closeModal(); showToast(`${newName} added to roster`);
 };
 
-function showWideModal(html) {
-  const mc = document.getElementById('modal-content');
-  mc.innerHTML = html;
-  mc.style.maxWidth = '640px';
-  document.getElementById('modal-overlay').style.display = 'flex';
-}
-function resetModalWidth() { document.getElementById('modal-content').style.maxWidth = ''; }
-const _origCloseModal = window.closeModal;
-window.closeModal = function() { resetModalWidth(); _origCloseModal(); };
-
-// ── BATTLE REPORT ──────────────────────────────────────────────────────────
-function _letterTemplate(faction, rank, name, squadron, opponents, turn, phase, summary) {
-  const oppList = opponents.map(o => {
-    const p = (appData.players||{})[o];
-    return p ? `${p.officerName} (${p.faction})` : o;
-  }).join(' and ');
-  const sqNote = squadron ? `, commanding the ${squadron} Squadron,` : '';
-  const oppNote = oppList ? ` against the forces of ${oppList}` : '';
-
-  if (faction === 'French') {
-    return `Au Ministre de la Marine et des Colonies,\n\nExcellence,\n\nJ'ai l'honneur de soumettre à Votre Excellence le rapport de l'action qui s'est tenue au cours du Tour ${turn}, Phase ${phase}, dans les eaux de la Station de Biscaye et d'Ibérie.\n\nMoi-même${sqNote} me suis trouvé en présence de l'ennemi${oppNote}.\n\n${summary}\n\nLa conduite des officiers et des hommes placés sous mon commandement a été, en toutes circonstances, digne des plus grands éloges.\n\nJ'ai l'honneur d'être, avec le plus profond respect, de Votre Excellence, le très humble et très obéissant serviteur,\n\n${rank} ${name}\nCommandant l'Escadre${squadron ? ' — ' + squadron : ''}`;
-  }
-  if (faction === 'Spanish') {
-    return `A Su Excelencia el Ministro de Marina,\n\nExcelencia,\n\nTengo el honor de presentar a Vuestra Excelencia el informe de la acción que tuvo lugar durante el Turno ${turn}, Fase ${phase}, en las aguas de la Estación del Golfo de Vizcaya e Iberia.\n\nYo mismo${sqNote} me enfrenté${oppNote}.\n\n${summary}\n\nLa conducta de los oficiales y marineros bajo mi mando fue, en todo momento, digna del más alto elogio.\n\nTengo el honor de ser, con el más profundo respeto, de Vuestra Excelencia, el más humilde y obediente servidor,\n\n${rank} ${name}\nComandante${squadron ? ', Escuadra ' + squadron : ''}`;
-  }
-  // Default: British
-  return `To the Lords Commissioners of the Admiralty,\n\nMy Lords,\n\nI have the honour to most respectfully lay before your Lordships an account of the action which took place during Turn ${turn}, Phase ${phase}, in the waters of the Biscay & Iberian Station.\n\nI${sqNote} found myself engaged${oppNote}.\n\n${summary}\n\nThe conduct of the officers and men under my command was, throughout, deserving of the highest praise.\n\nI have the honour to be,\nMy Lords,\nYour Lordships' most obedient servant,\n\n${rank} ${name}\nCommanding${squadron ? ', ' + squadron + ' Squadron' : ''}`;
-}
-
+// ─── LOG MODAL ────────────────────────────────────────────────────────────────
 window.openAddLog = function() {
-  const players = Object.entries(appData.players || {}).filter(([id]) => id !== 'merchant');
-  const meta = appData.meta || {};
-  showWideModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
-    <h2>&#x2693; Battle Report</h2>
-    <p style="color:var(--text-muted);font-size:0.82rem;margin-bottom:14px">Select the commanders involved, write a summary, then draft the admiralty report.</p>
-
-    <div class="form-row"><label>Reporting Commander</label>
-      <select id="log-reporter">${players.map(([id,p])=>`<option value="${id}">${FACTION_FLAG[p.faction]||''} ${p.officerName} (${p.name})</option>`).join('')}</select>
-    </div>
-    <div class="form-row"><label>Squadron Engaged <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
-      <input id="log-squadron" placeholder="e.g. A, or leave blank"></div>
-
-    <div class="form-row" style="margin-top:10px"><label>Opposing Forces</label>
-      <div class="player-check-grid">
-        ${players.map(([id,p])=>`<label class="player-check"><input type="checkbox" id="log-opp-${id}" value="${id}"> ${FACTION_FLAG[p.faction]||''} ${p.officerName} <span style="color:var(--text-muted);font-size:0.75rem">${p.name}</span></label>`).join('')}
-      </div>
-    </div>
-
-    <div class="form-row" style="margin-top:10px"><label>Battle Summary</label>
-      <textarea id="log-summary" rows="5" placeholder="Describe the engagement — positions, manoeuvres, broadsides, boarding actions, outcomes…" style="font-size:0.88rem;line-height:1.6"></textarea>
-    </div>
-
+  const factions = ['British','French','Spanish','All'];
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Add Log Entry</h2>
+    <div class="form-row"><label>Faction</label><select id="log-faction">${factions.map(f=>`<option>${f}</option>`).join('')}</select></div>
+    <div class="form-row"><label>Entry</label><textarea id="log-text" rows="3" placeholder="Describe what happened…"></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="draftBattleReport()">Draft Report &#x2192;</button>
+      <button class="btn" onclick="addLog()">Add</button>
     </div>`);
 };
 
-window.draftBattleReport = async function() {
-  const reporter  = document.getElementById('log-reporter').value;
-  const squadron  = document.getElementById('log-squadron').value.trim();
-  const summary   = document.getElementById('log-summary').value.trim();
-  const players   = appData.players || {};
-  const meta      = appData.meta || {};
-  const opponents = Object.keys(players).filter(id => {
-    const el = document.getElementById(`log-opp-${id}`);
-    return el && el.checked;
-  });
-  if (!summary) { showToast('Please enter a battle summary'); return; }
-
-  const rp = players[reporter] || {};
-  const oppNames = opponents.map(id => {
-    const p = players[id];
-    return p ? `${p.officerName} (${p.faction}, commanding ${p.name})` : id;
-  }).join(', ');
-
-  // Store draft data for confirm step
-  window._pendingReport = { reporter, opponents, squadron, summary, letter: null, turn: meta.turn||1, phase: meta.phase||1 };
-
-  // Show loading state
-  const oppTags = opponents.map(id => { const p=players[id]; return p?`${FACTION_FLAG[p.faction]||''} ${p.officerName}`:id; }).join(', ');
-  showWideModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
-    <h2>&#x2693; Drafting Dispatch…</h2>
-    <div style="color:var(--text-muted);font-size:0.85rem;margin-top:20px;text-align:center">
-      <div style="font-size:2rem;margin-bottom:12px">⚓</div>
-      Composing the admiralty letter — this will take a moment…
-    </div>`);
-
-  // Build faction-specific style guidance
-  const factionGuide = {
-    French: `Open with "Mon Général," — write as a French naval officer reporting to the Minister of Marine. Use formal 18th-century French naval prose translated into English. Sign off: "I have the honour to remain, Mon Général, Your obedient servant," then the officer's name, rank, and ship.`,
-    Spanish: `Open with "Most Excellent Sir," — write as a Spanish naval officer of the Armada Española reporting to the Minister of Marine. Formal and dignified. Sign off: "I have the honour to be, Your Excellency's most obedient and humble servant," then name, rank (in Spanish), and squadron.`,
-    British: `Open with "Sir," — write as a Royal Navy officer submitting a report to Their Lordships of the Admiralty. Formal, restrained, and precise 18th-century naval prose. Sign off: "I have the honour to be, Sir, Your most obedient and humble servant," then the officer's name, rank, and ship.`
-  };
-  const style = factionGuide[rp.faction] || factionGuide.British;
-
-  const systemPrompt = `You are a naval officer writing an official action report in the style of authentic 18th-century Napoleonic-era naval dispatches (circa 1796–1808). Write in the voice of the reporting officer. The letter should read exactly like a real period naval dispatch — formal, detailed, restrained in emotion, precise about ships and manoeuvres, with period-appropriate vocabulary. ${style} Do not add a subject line or date. Do not add any modern framing. Output only the letter text itself.`;
-
-  const userPrompt = `Write an action dispatch for the following engagement:
-
-Turn: ${meta.turn||1}, Phase: ${meta.phase||1}
-Reporting officer: ${rp.officerName||reporter}, rank: ${rp.rank||'Commander'}, ship/squadron: ${rp.name||''}${squadron?' — '+squadron+' Squadron':''}
-Faction: ${rp.faction||'British'}
-Opposing forces: ${oppNames||'enemy forces'}
-
-Battle summary (written by the player — use this as the factual basis, but expand it into full period prose):
-${summary}
-
-Write the full dispatch letter now.`;
-
-  try {
-    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0.7,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ]
-      })
-    });
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || resp.statusText); }
-    const data = await resp.json();
-    const letter = data.choices[0].message.content.trim();
-    window._pendingReport.letter = letter;
-
-    showWideModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
-      <h2>&#x2693; Admiralty Dispatch</h2>
-      <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
-        Turn ${meta.turn||1} · Phase ${meta.phase||1} · ${FACTION_FLAG[rp.faction]||''} ${rp.officerName}${oppTags?' vs '+oppTags:''}
-      </div>
-      <div class="letter-box">${letter.replace(/\n/g,'<br>')}</div>
-      <div class="modal-actions" style="margin-top:16px">
-        <button class="btn btn-ghost" onclick="openAddLog()">&#x2190; Edit</button>
-        <button class="btn" onclick="confirmBattleReport()">Confirm &amp; Log</button>
-      </div>`);
-  } catch(err) {
-    showWideModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
-      <h2>&#x2693; Battle Report</h2>
-      <div style="color:var(--red);padding:16px">Failed to generate dispatch: ${err.message}</div>
-      <div class="modal-actions"><button class="btn btn-ghost" onclick="openAddLog()">&#x2190; Back</button></div>`);
-  }
-};
-
-;
-
-window.confirmBattleReport = async function() {
-  const r = window._pendingReport;
-  if (!r) return;
-  await push(ref(db, '/log'), {
-    type: 'battle',
-    turn: r.turn,
-    phase: r.phase,
-    reporter: r.reporter,
-    opponents: r.opponents,
-    squadron: r.squadron || '',
-    summary: r.summary,
-    letter: r.letter,
-    timestamp: new Date().toISOString(),
-  });
-  window._pendingReport = null;
-  closeModal();
-  showToast('Battle report logged');
-};
-
-window.toggleLetter = function(id) {
-  const box = document.getElementById('letter-'+id);
-  const btn = document.getElementById('ltoggle-'+id);
-  if (!box) return;
-  const collapsed = box.classList.toggle('letter-collapsed');
-  btn.textContent = collapsed ? 'Read full dispatch ▾' : 'Collapse ▴';
-};
-window.draftBattleReport = function() {
-  const reporter = document.getElementById('log-reporter').value;
-  const squadron = document.getElementById('log-squadron').value.trim();
-  const summary  = document.getElementById('log-summary').value.trim();
-  const players  = appData.players || {};
-  const meta     = appData.meta || {};
-  const opponents = Object.keys(players).filter(id => { const el=document.getElementById('log-opp-'+id); return el&&el.checked; });
-  if (!summary) { showToast('Please enter a battle summary'); return; }
-  const rp     = players[reporter] || {};
-  const letter = _letterTemplate(rp.faction, rp.rank||'Commander', rp.officerName||reporter, squadron, opponents, meta.turn||1, meta.phase||1, summary);
-  const oppTags = opponents.map(id => { const p=players[id]; return p?(FACTION_FLAG[p.faction]||'')+' '+p.officerName:id; }).join(', ');
-  window._pendingReport = { reporter, opponents, squadron, summary, letter, turn:meta.turn||1, phase:meta.phase||1 };
-  const rMeta = 'Turn '+(meta.turn||1)+', Phase '+(meta.phase||1)+' &nbsp;&middot;&nbsp; '+(FACTION_FLAG[rp.faction]||'')+' '+rp.officerName+(oppTags?' vs '+oppTags:'');
-  showWideModal('<button class="modal-close" onclick="closeModal()">&#x2715;</button>'
-    + '<h2>&#x2693; Admiralty Dispatch</h2>'
-    + '<div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">'+rMeta+'</div>'
-    + '<div class="letter-box">'+letter+'</div>'
-    + '<div class="modal-actions" style="margin-top:16px"><button class="btn btn-ghost" onclick="openAddLog()">&#x2190; Edit</button><button class="btn" onclick="confirmBattleReport()">Confirm &amp; Log</button></div>');
-};
-
-window.confirmBattleReport = async function() {
-  const r = window._pendingReport;
-  if (!r) return;
-  await push(ref(db, '/log'), {
-    type:'battle', turn:r.turn, phase:r.phase,
-    reporter:r.reporter, opponents:r.opponents, squadron:r.squadron||'',
-    summary:r.summary, letter:r.letter,
-    timestamp: new Date().toISOString(),
-  });
-  window._pendingReport = null;
-  closeModal(); showToast('Battle report logged');
-};
-
-window.toggleLetter = function(id) {
-  const box = document.getElementById('letter-'+id);
-  const btn = document.getElementById('ltoggle-'+id);
-  if (!box) return;
-  const isNowCollapsed = box.classList.toggle('letter-collapsed');
-  btn.textContent = isNowCollapsed ? 'Read full dispatch ▾' : 'Collapse ▴';
-};
 window.addLog = async function() {
   const text = document.getElementById('log-text').value.trim();
   if (!text) return;
