@@ -924,11 +924,6 @@ function shipCard(id, s) {
         ${s.squadron ? `<div class="squadron-label">Squadron ${s.squadron}</div>` : ''}
       </div>
       <div class="ship-actions">
-        ${s.status === 'active' && (s.location || '').startsWith('Zone') ? (() => {
-          const currentTurn = (appData.meta || {}).turn || 1;
-          const used = s.juryRigTurn === currentTurn;
-          return `<button class="btn btn-sm btn-ghost" style="${used ? 'opacity:0.4;cursor:not-allowed' : 'color:var(--accent2)'}" ${used ? 'disabled' : `onclick="juryRigRepair('${id}')"`} title="${used ? 'Jury rig already used this turn' : 'At-sea D3 jury rig repair (once per turn)'}">⚓ D3</button>`;
-        })() : ''}
         <button class="btn btn-sm btn-ghost" onclick="openEditShip('${id}')">Edit</button>
       </div>
     </div>
@@ -1802,6 +1797,9 @@ window.openEditShip = function(id) {
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
       <button class="btn" onclick="saveShip('${id}')">Save</button>
     </div>`);
+  // Store ship id on breakdown element so recalcRepairCost can embed the jury rig button
+  const bd = document.getElementById('repair-cost-breakdown');
+  if (bd) bd.dataset.shipId = id;
   _renderAsDecks(); _renderAsBroad(); _renderStructDamageList(); recalcRepairCost();
 };
 
@@ -1865,7 +1863,17 @@ window.recalcRepairCost = function() {
     costEl.value = 0;
     if (breakdown) {
       breakdown.style.display = 'block';
-      breakdown.innerHTML = `<strong style="color:var(--accent2)">Roadstead / At Sea</strong> — jury rig only, free, up to D3 SP. Cannot repair structural damage.`;
+      const shipId = breakdown.dataset.shipId || '';
+      const currentTurn = (appData.meta || {}).turn || 1;
+      const shipData = (appData.ships || {})[shipId] || {};
+      const used = shipData.juryRigTurn === currentTurn;
+      const btnHtml = shipId
+        ? `<br><button class="btn btn-sm" style="margin-top:6px;${used ? 'opacity:0.45;cursor:not-allowed' : 'color:var(--surface1);background:var(--accent2)'}"
+            ${used ? 'disabled' : `onclick="juryRigRepair('${shipId}')"`}>
+            ⚓ D3 Jury Rig Repair${used ? ' (used this turn)' : ''}
+           </button>`
+        : '';
+      breakdown.innerHTML = `<strong style="color:var(--accent2)">Roadstead / At Sea</strong> — jury rig only, free, up to D3 SP. Cannot repair structural damage.${btnHtml}`;
     }
     return;
   }
