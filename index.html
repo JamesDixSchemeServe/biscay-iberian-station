@@ -573,6 +573,7 @@ function renderCurrentTab() {
   const players = appData.players || {};
   if (players[currentTab]) {
     c.innerHTML = renderPlayer(currentTab);
+    initShipDrag();
   } else {
     switch(currentTab) {
       case 'overview':      c.innerHTML = renderOverview(); break;
@@ -788,8 +789,9 @@ function renderPlayer(pid) {
     const bySquadron = {};
     squadronShips.forEach(([id,s]) => { const sq = s.squadron || '(no squadron)'; (bySquadron[sq]||(bySquadron[sq]=[])).push([id,s]); });
     for (const [sq, sqs] of Object.entries(bySquadron)) {
+      sqs.sort(([,a],[,b]) => (a.sortOrder??9999) - (b.sortOrder??9999));
       html += `<div class="section-label">${sq !== '(no squadron)' ? `Squadron ${sq}` : 'Individual / Detached'}</div>`;
-      html += `<div class="ship-list">${sqs.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+      html += `<div class="ship-list" data-sqnkey="${pid}|||${sq}">${sqs.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
     }
     if (detached.length) {
       html += `<div class="section-label">Scouts &amp; Screens</div>`;
@@ -927,6 +929,41 @@ function _defaultRig(type) {
   if (t.includes('cutter')||t.includes('schooner')||t.includes('lugger')||t.includes('polacre')) return 'Fore and Aft';
   return 'Square';
 }
+function initShipDrag() {
+  let dragId = null, dragEl = null;
+  document.querySelectorAll('[data-sqnkey]').forEach(list => {
+    list.addEventListener('dragstart', e => {
+      const card = e.target.closest('[data-shipid]');
+      if (!card) return;
+      dragId = card.dataset.shipid;
+      dragEl = card;
+      e.dataTransfer.effectAllowed = 'move';
+      setTimeout(() => card.style.opacity = '0.4', 0);
+    });
+    list.addEventListener('dragend', e => {
+      const card = e.target.closest('[data-shipid]');
+      if (card) card.style.opacity = '';
+      dragEl = null;
+    });
+    list.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (!dragEl) return;
+      const card = e.target.closest('[data-shipid]');
+      if (!card || card === dragEl) return;
+      const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
+      list.insertBefore(dragEl, e.clientY < mid ? card : card.nextSibling);
+    });
+    list.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!dragId) return;
+      const orderedIds = [...list.querySelectorAll('[data-shipid]')].map(el => el.dataset.shipid);
+      const updates = {};
+      orderedIds.forEach((id, i) => { updates[`/ships/${id}/sortOrder`] = i; });
+      await update(cref('/'), updates);
+    });
+  });
+}
+
 window.shipSpAdj = async function(id, delta) {
   const s=(appData.ships||{})[id]; if(!s) return;
   const n=Math.max(0,Math.min(s.spMax,(s.spCurrent||0)+delta));
@@ -977,7 +1014,7 @@ function shipCard(id, s) {
   const breakVal = _shipBreak(s.type, s.spMax);
   const spColor = s.spCurrent <= breakVal ? 'var(--red)' : pct < 0.5 ? '#e8a44a' : 'var(--text)';
 
-  return `<div class="ship-card ${s.status}" id="sc-${id}">
+  return `<div class="ship-card ${s.status}" id="sc-${id}" draggable="true" data-shipid="${id}">
     <div class="ship-top">
       <div>
         <div class="ship-name">${s.name}</div>
@@ -1013,8 +1050,8 @@ function shipCard(id, s) {
     <div class="game-stat-bar">
       <div class="gs-item"><div class="gs-label">Size</div><div class="gs-val">${_shipSize(s.type)}</div></div>
       <div class="gs-item"><div class="gs-label">Broadsides</div><div class="gs-val" style="color:var(--accent)">${broadStr||'—'}</div></div>
-      <div class="gs-item"><div class="gs-label">Bow</div><div class="gs-val">${CHASER_LABELS[s.bowChaser]||'—'}</div></div>
-      <div class="gs-item"><div class="gs-label">Stern</div><div class="gs-val">${CHASER_LABELS[s.sternChaser]||'—'}</div></div>
+      <div class="gs-item"><div class="gs-label">Bow</div><div class="gs-val">${s.bowChaser||'—'}</div></div>
+      <div class="gs-item"><div class="gs-label">Stern</div><div class="gs-val">${s.sternChaser||'—'}</div></div>
       <div class="gs-item"><div class="gs-label">SP</div><div class="gs-val gs-sp"><button class="gs-btn" onclick="shipSpAdj('${id}',-1)">−</button><span style="color:${spColor}">${s.spCurrent}/${s.spMax}</span><button class="gs-btn" onclick="shipSpAdj('${id}',1)">+</button></div></div>
       <div class="gs-item"><div class="gs-label">Turn</div><div class="gs-val" style="color:${_shipTurn(s.type)==='Red'?'var(--red)':_shipTurn(s.type)==='Yellow'?'#f4c430':'var(--green)'}">${_shipTurn(s.type)}</div></div>
       <div class="gs-item"><div class="gs-label">Knots</div><div class="gs-val">${_shipKnots(s.type, s.fastSailer)}</div></div>
