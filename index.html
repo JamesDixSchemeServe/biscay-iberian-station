@@ -1557,8 +1557,9 @@ window.openInterception = function() {
   const usedThisTurn = (appData.meta || {}).interceptionUsed || {};
   const sqnUsed = key => !!usedThisTurn[key.replace(/\|/g,'_')];
 
-  // Build squadron groups per zone: key = zone, value = array of { key, player, faction, playerName, squadron, ships[] }
+  // Build squadron groups per zone, separating scouts/screens into a per-zone per-player modifier pool
   const zoneSquadrons = {}; // zone → [squadronEntry]
+  const zoneRoleShips = {};  // zone → { playerId → [scout/screen ships] }
   Object.entries(ships).forEach(([id, s]) => {
     if (s.status === 'sunk' || s.status === 'lost' || s.status === 'captured' || s.status === 'repairing') return;
     const loc = s.location || '';
@@ -1566,6 +1567,15 @@ window.openInterception = function() {
     const p = players[s.player] || {};
     const fac = p.faction || s.faction || '';
     const isMerch = !fac || fac === 'Merchant' || MERCHANT_FACTIONS.includes(fac);
+
+    // Scouts and screens go into the modifier pool, not the squadron list
+    if (s.role === 'inshoreScout' || s.role === 'squadronScreen') {
+      if (!zoneRoleShips[loc]) zoneRoleShips[loc] = {};
+      if (!zoneRoleShips[loc][s.player]) zoneRoleShips[loc][s.player] = [];
+      zoneRoleShips[loc][s.player].push({id, ...s});
+      return;
+    }
+
     if (!zoneSquadrons[loc]) zoneSquadrons[loc] = [];
     const sqnKey = `${s.player}|||${s.squadron||''}`;
     let entry = zoneSquadrons[loc].find(e => e.key === sqnKey);
@@ -1576,6 +1586,7 @@ window.openInterception = function() {
     }
     entry.ships.push({id, ...s});
   });
+  window._interceptRoleShips = zoneRoleShips;
 
   // Find zones with at least two non-allied military squadrons (or 1 military + merchant convoy)
   const contestedZones = Object.entries(zoneSquadrons).filter(([, sqns]) => {
@@ -1617,8 +1628,26 @@ window.openInterception = function() {
     let defSeeker = mil[0], defTarget = mil.find((e,i) => i > 0 && !areAllied(defSeeker.faction, e.faction));
     if (!defTarget && merchants.length) defTarget = null; // seeker vs convoy
 
+    // Build scout/screen summary for this zone
+    const zoneRoles = (zoneRoleShips[zone] || {});
+    const roleSummaryParts = [];
+    Object.entries(zoneRoles).forEach(([pid, rships]) => {
+      const pname = (players[pid] || {}).name || pid;
+      rships.forEach(s => {
+        const roleLabel = s.role === 'inshoreScout' ? 'Scout +1' : 'Screen −1';
+        const used = usedThisTurn[`${pid}|||${s.id}`.replace(/\|/g,'_')];
+        roleSummaryParts.push(`${pname}: ${s.name} (${roleLabel})${used ? ' <span style="opacity:0.5">✓ used</span>' : ''}`);
+      });
+    });
+    const roleSummaryHtml = roleSummaryParts.length
+      ? `<div style="font-size:0.76rem;color:var(--text-muted);margin-bottom:8px;padding:5px 8px;background:var(--surface2);border-radius:4px">
+           <strong style="color:var(--text)">Scouts &amp; Screens in zone:</strong> ${roleSummaryParts.join(' &nbsp;|&nbsp; ')}
+         </div>`
+      : '';
+
     html += `<div class="card" style="margin-bottom:12px" id="izone-${zoneId}">
-      <div style="font-weight:700;font-size:0.95rem;margin-bottom:10px">⚓ ${zone}</div>
+      <div style="font-weight:700;font-size:0.95rem;margin-bottom:8px">⚓ ${zone}</div>
+      ${roleSummaryHtml}
       <div class="form-grid" style="gap:8px;margin-bottom:8px">
         <div class="form-row"><label>Seeker squadron</label>
           <select id="iseek-${zoneId}" onchange="recalcInterceptionMod('${zoneId}')">
@@ -1696,15 +1725,41 @@ window.recalcInterceptionMod = function(zoneId) {
     ? sqns.filter(e => e.isMerchant).flatMap(e => e.ships)
     : (tgtEntry ? tgtEntry.ships : []);
 
+  const rolePool = (window._interceptRoleShips || {})[zone] || {};
+  const usedKeys = (appData.meta || {}).interceptionUsed || {};
+
+  // Seeker's scouts in this zone (if not already used this turn)
+  const seekerRoleShips = seekEntry ? (rolePool[seekEntry.player] || []) : [];
+  const availScouts = seekerRoleShips.filter(s => s.role === 'inshoreScout'
+    && !usedKeys[`${s.player}|||${s.id||''}`.replace(/\|/g,'_')]);
+  const usedScouts  = seekerRoleShips.filter(s => s.role === 'inshoreScout'
+    && usedKeys[`${s.player}|||${s.id||''}`.replace(/\|/g,'_')]);
+
+  // Target's screens in this zone (if not already used this turn)
+  const tgtPlayer = tgtEntry ? tgtEntry.player : null;
+  const tgtRoleShips = tgtPlayer ? (rolePool[tgtPlayer] || []) : [];
+  const availScreens = tgtRoleShips.filter(s => s.role === 'squadronScreen'
+    && !usedKeys[`${s.player}|||${s.id||''}`.replace(/\|/g,'_')]);
+  const usedScreens  = tgtRoleShips.filter(s => s.role === 'squadronScreen'
+    && usedKeys[`${s.player}|||${s.id||''}`.replace(/\|/g,'_')]);
+
   if (tgtKey === '__merchant__' || sqns.some(e => e.isMerchant && e.ships.length)) {
     mod += 2; modLines.push('+2 Merchant convoy present');
   }
-  const scouts = seekShips.filter(s => s.role === 'inshoreScout').length;
-  if (scouts) { mod += scouts; modLines.push(`+${scouts} Inshore Scout${scouts>1?'s':''}`); }
+  if (availScouts.length) {
+    mod += availScouts.length;
+    modLines.push(`+${availScouts.length} Inshore Scout${availScouts.length>1?'s':''}`);
+  }
+  if (usedScouts.length) modLines.push(`(${usedScouts.length} scout${usedScouts.length>1?'s':''} already used)`);
+
   const damaged = tgtShips.some(s => (s.spCurrent||0) < (s.spMax||1) * 0.5);
   if (damaged) { mod += 1; modLines.push('+1 Target below 50% SP'); }
-  const screens = tgtShips.filter(s => s.role === 'squadronScreen').length;
-  if (screens) { mod -= screens; modLines.push(`−${screens} Squadron Screen${screens>1?'s':''}`); }
+
+  if (availScreens.length) {
+    mod -= availScreens.length;
+    modLines.push(`−${availScreens.length} Squadron Screen${availScreens.length>1?'s':''}`);
+  }
+  if (usedScreens.length) modLines.push(`(${usedScreens.length} screen${usedScreens.length>1?'s':''} already used)`);
   mod = Math.max(-3, Math.min(3, mod));
 
   const modStr = mod >= 0 ? `+${mod}` : `${mod}`;
@@ -1745,31 +1800,47 @@ window.rollInterception = function(zoneId) {
     el.innerHTML = `<strong style="color:${col}">${d1}+${d2}=${raw}${modNote} — ${intercepts?'⚔ BATTLE':'✗ No intercept'}</strong>${forced?` <span style="font-size:0.75rem;color:var(--text-muted)">(forced)</span>`:''}`;
   }
 
-  // Mark both squadrons as used for this turn
+  // Mark squadrons and any contributing scouts/screens as used for this turn
+  if (!appData.meta) appData.meta = {};
+  if (!appData.meta.interceptionUsed) appData.meta.interceptionUsed = {};
   const updates = {};
-  if (seekKey) updates[`/meta/interceptionUsed/${seekKey.replace(/\|/g,'_')}`] = true;
-  if (tgtKey && tgtKey !== '__merchant__') updates[`/meta/interceptionUsed/${tgtKey.replace(/\|/g,'_')}`] = true;
-  if (Object.keys(updates).length) {
-    update(cref('/'), updates);
-    // Update local cache so re-rolls are blocked immediately
-    if (!appData.meta) appData.meta = {};
-    if (!appData.meta.interceptionUsed) appData.meta.interceptionUsed = {};
-    if (seekKey) appData.meta.interceptionUsed[seekKey.replace(/\|/g,'_')] = true;
-    if (tgtKey && tgtKey !== '__merchant__') appData.meta.interceptionUsed[tgtKey.replace(/\|/g,'_')] = true;
-    // Disable the roll button and grey out used options in this zone
-    const rollBtn = document.querySelector(`#izone-${zoneId} .btn`);
-    if (rollBtn) { rollBtn.disabled = true; rollBtn.style.opacity = '0.45'; }
-    [document.getElementById(`iseek-${zoneId}`), document.getElementById(`itgt-${zoneId}`)].forEach(sel => {
-      if (!sel) return;
-      [...sel.options].forEach(opt => {
-        const k = decodeURIComponent(opt.value);
-        if (k && k !== '__merchant__' && appData.meta.interceptionUsed[k]) {
-          opt.disabled = true;
-          if (!opt.text.includes('✓ used')) opt.text += ' ✓ used';
-        }
-      });
-    });
+
+  const markUsed = key => {
+    const fbKey = key.replace(/\|/g,'_');
+    updates[`/meta/interceptionUsed/${fbKey}`] = true;
+    appData.meta.interceptionUsed[fbKey] = true;
+  };
+
+  if (seekKey) markUsed(seekKey);
+  if (tgtKey && tgtKey !== '__merchant__') markUsed(tgtKey);
+
+  // Mark scout/screen ships as used via their ship id
+  const rolePool = (window._interceptRoleShips || {})[zone] || {};
+  if (seekEntry) {
+    (rolePool[seekEntry.player] || []).filter(s => s.role === 'inshoreScout').forEach(s => markUsed(`${s.player}|||${s.id}`));
   }
+  if (tgtEntry) {
+    (rolePool[tgtEntry.player] || []).filter(s => s.role === 'squadronScreen').forEach(s => markUsed(`${s.player}|||${s.id}`));
+  }
+
+  update(cref('/'), updates);
+
+  // Disable roll button and grey out used squadron options
+  const rollBtn = document.querySelector(`#izone-${zoneId} .btn`);
+  if (rollBtn) { rollBtn.disabled = true; rollBtn.style.opacity = '0.45'; }
+  [document.getElementById(`iseek-${zoneId}`), document.getElementById(`itgt-${zoneId}`)].forEach(sel => {
+    if (!sel) return;
+    [...sel.options].forEach(opt => {
+      const k = decodeURIComponent(opt.value);
+      const fbK = k.replace(/\|/g,'_');
+      if (k && k !== '__merchant__' && appData.meta.interceptionUsed[fbK]) {
+        opt.disabled = true;
+        if (!opt.text.includes('✓ used')) opt.text += ' ✓ used';
+      }
+    });
+  });
+  // Refresh modifier display to show scouts/screens now marked used
+  recalcInterceptionMod(zoneId);
 };
 
 // ─── HISTORY ─────────────────────────────────────────────────────────────────
