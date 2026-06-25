@@ -508,8 +508,9 @@ function renderOverview() {
     const favClass = p.admiraltyFavour > 0 ? 'fav-pos' : p.admiraltyFavour < 0 ? 'fav-neg' : 'fav-zero';
     const favLabel = p.admiraltyFavour > 0 ? `+${p.admiraltyFavour}` : `${p.admiraltyFavour}`;
     html += `<div class="player-card" onclick="showPlayerModal('${pid}')">
-      <h3><span class="faction-dot" style="background:${FACTION_COLOR[p.faction]}"></span>${p.name}</h3>
-      <div style="font-size:0.75rem;color:var(--text-muted)">${p.faction}</div>
+      <h3>${FACTION_FLAG[p.faction]||''} ${p.name}</h3>
+      ${p.officerName ? `<div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:2px;font-style:italic">${p.officerName}</div>` : ''}
+      <div style="font-size:0.75rem;color:var(--text-muted)">${p.rank||'Master and Commander'}</div>
       <div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">resources</span></div>
       <div class="favour">Admiralty Favour: <span class="favour-val ${favClass}">${favLabel}</span> · ${pShips} ships</div>
     </div>`;
@@ -558,7 +559,25 @@ function renderOverview() {
 
 window.adjustTurn = async function(delta) {
   const newVal = Math.max(1, (appData.meta.turn || 1) + delta);
-  await update(cref('/meta'), { turn: newVal });
+  const multiUpdate = { '/meta/turn': newVal };
+
+  // On advance: complete repairs whose availableIn matches the new turn
+  if (delta > 0) {
+    const ships = appData.ships || {};
+    const completing = Object.entries(ships).filter(([,s]) =>
+      s.status === 'repairing' && s.availableIn === `Turn ${newVal}`
+    );
+    completing.forEach(([id, s]) => {
+      multiUpdate[`/ships/${id}/status`]        = 'active';
+      multiUpdate[`/ships/${id}/spCurrent`]     = s.spMax;
+      multiUpdate[`/ships/${id}/repairCostPaid`]= 0;
+      multiUpdate[`/ships/${id}/availableIn`]   = '';
+      multiUpdate[`/ships/${id}/repairPort`]    = '';
+    });
+    if (completing.length) showToast(`Turn ${newVal}: ${completing.length} ship(s) returned to active service`);
+  }
+
+  await update(cref('/'), multiUpdate);
 };
 
 window.adjustPhase = async function(delta) {
@@ -1295,7 +1314,7 @@ function shipFormHtml(s) {
 
     <div class="form-grid">
       <div class="form-row"><label>Location</label><select id="sf-location">${ZONES.map(z=>`<option${s.location===z?' selected':''}>${z}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Squadron</label><input id="sf-squadron" value="${s.squadron||''}"></div>
+      <div class="form-row"><label>Squadron</label><select id="sf-squadron"><option value="">— None —</option>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l=>`<option value="${l}"${s.squadron===l?' selected':''}>${l}</option>`).join('')}</select></div>
     </div>
     <div class="form-grid">
       <div class="form-row"><label>Crew Level</label><select id="sf-crew">${CREW_LEVELS.map(c=>`<option${s.crewLevel===c?' selected':''}>${c}</option>`).join('')}</select></div>
@@ -1589,7 +1608,7 @@ window.openAddShip = function(playerId, faction) {
     <div class="section-label" style="margin-top:14px">Campaign Details</div>
     <div class="form-grid">
       <div class="form-row"><label>Location</label><select id="as-location">${ZONES.map(z=>`<option>${z}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Squadron</label><input id="as-squadron" value=""></div>
+      <div class="form-row"><label>Squadron</label><select id="as-squadron"><option value="">— None —</option>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l=>`<option value="${l}">${l}</option>`).join('')}</select></div>
     </div>
     <div class="form-row"><label>Status</label><select id="as-status">${STATUSES.map(st=>`<option${st==='active'?' selected':''}>${st}</option>`).join('')}</select></div>
     <div class="form-row"><label>Officer Assigned</label><select id="as-officer">${officerOpts}</select></div>
@@ -1657,7 +1676,8 @@ window.saveNewShip = async function() {
 window.saveShip = async function(id) {
   const existing = (appData.ships || {})[id];
   const data = readShipForm(existing);
-  // When transferred to a new player, clear squadron, set to captured/pending, update faction
+
+  // Transfer to new player
   if (data.player !== existing.player) {
     data.squadron = '';
     data.status = 'captured';
@@ -1665,8 +1685,33 @@ window.saveShip = async function(id) {
     const newOwner = (appData.players || {})[data.player];
     if (newOwner) data.faction = newOwner.faction;
   }
+
+  // Entering repair: snap location to repairPort and deduct cost
+  const enteringRepair = data.status === 'repairing' && existing.status !== 'repairing';
+  if (enteringRepair) {
+    if (data.repairPort) data.location = data.repairPort;
+    const cost = data.repairCostPaid || 0;
+    if (cost > 0) {
+      const player = (appData.players || {})[data.player];
+      const currentRes = player?.resources ?? 0;
+      if (currentRes < cost) {
+        showToast(`Insufficient resources — need ${cost}, have ${currentRes}`);
+        return;
+      }
+      if (!confirm(`Send ${data.name} for repair at ${data.repairPort||'port'}?\n\nRepair cost: ${cost} resources\nRemaining: ${currentRes - cost} resources`)) return;
+      const updates = {};
+      updates[`/ships/${id}`] = data;
+      updates[`/players/${data.player}/resources`] = currentRes - cost;
+      await update(cref('/'), updates);
+      closeModal();
+      showToast(`${data.name} sent for repair — ${cost} resources deducted`);
+      return;
+    }
+  }
+
   await set(cref(`/ships/${id}`), data);
-  closeModal(); showToast(data.player !== existing.player ? 'Ship transferred — pending prize decision' : 'Ship updated');
+  closeModal();
+  showToast(data.player !== existing.player ? 'Ship transferred — pending prize decision' : 'Ship updated');
 };
 
 
@@ -1757,7 +1802,7 @@ window.openAddLog = function() {
     </div>
     <div class="form-grid">
       <div class="form-row"><label>Squadron <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
-        <input id="log-squadron" placeholder="e.g. A"></div>
+        <select id="log-squadron"><option value="">— None —</option>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l=>`<option value="${l}">${l}</option>`).join('')}</select></div>
       <div class="form-row"><label>Date</label>
         <input type="date" id="log-date" value="${new Date().toISOString().slice(0,10)}"></div>
     </div>
