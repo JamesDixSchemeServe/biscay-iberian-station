@@ -687,6 +687,7 @@ window.adjustTurn = async function(delta) {
     if (completing.length) showToast(`Turn ${newVal}: ${completing.length} ship(s) returned to active service`);
   }
 
+  multiUpdate['/meta/movementDone'] = {};
   await update(cref('/'), multiUpdate);
 };
 
@@ -733,7 +734,15 @@ function renderPlayer(pid) {
     }).join('')}
   </div>`;
 
-  html += `<div class="ships-header"><div></div><button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button></div>`;
+  const moveDone = !!((appData.meta||{}).movementDone||{})[pid];
+  html += `<div class="ships-header">
+    <div>
+      ${moveDone
+        ? `<span style="color:var(--green);font-size:0.8rem">✓ Movement confirmed</span>`
+        : `<button class="btn btn-sm btn-ghost" onclick="confirmMovement('${pid}')">✓ Confirm Movement</button>`}
+    </div>
+    <button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button>
+  </div>`;
 
   const pShips = allPShips.filter(([,s]) => {
     if (activeFilter === 'all') return true;
@@ -976,14 +985,44 @@ function shipCard(id, s) {
 // ─── MERCHANT ─────────────────────────────────────────────────────────────────
 function renderMerchant() {
   const ships = Object.entries(appData.ships || {}).filter(([,s]) => s.player === 'merchant' || s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction));
+  const players = appData.players || {};
+  // Build list of active player squadrons for escort assignment
+  const escortOptions = [];
+  const allShips = appData.ships || {};
+  Object.entries(players).forEach(([pid, p]) => {
+    if (p.faction === 'Merchant' || MERCHANT_FACTIONS.includes(p.faction)) return;
+    const sqns = [...new Set(Object.values(allShips).filter(s => s.player === pid && s.status === 'active' && s.squadron).map(s => s.squadron))];
+    sqns.forEach(sq => escortOptions.push({ key: `${pid}|||${sq}`, label: `${FACTION_FLAG[p.faction]||''} ${p.name} — Sqn ${sq}` }));
+    // Also allow assigning to player without a squadron (all active ships)
+    const hasBare = Object.values(allShips).some(s => s.player === pid && s.status === 'active' && !s.squadron);
+    if (hasBare) escortOptions.push({ key: `${pid}|||`, label: `${FACTION_FLAG[p.faction]||''} ${p.name} — (no squadron)` });
+  });
+
   let html = `<div class="ships-header"><div style="font-size:0.9rem">Merchant Convoy</div>
     <button class="btn btn-sm" onclick="openAddShip('merchant','Merchant')">+ Add Ship</button>
   </div><div class="ship-list">`;
   if (!ships.length) html += `<div class="empty-state">No merchant ships.</div>`;
-  else html += ships.map(([id,s]) => shipCard(id,s)).join('');
+  else ships.forEach(([id, s]) => {
+    const escKey = s.escortedBy || '';
+    const escOpt = escortOptions.find(o => o.key === escKey);
+    html += shipCard(id, s);
+    html += `<div style="padding:4px 12px 10px;margin-top:-8px;background:var(--surface2);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius) var(--radius);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:0.75rem;color:var(--text-muted)">Escort:</span>
+      <select style="font-size:0.78rem;flex:1;min-width:0" onchange="setMerchantEscort('${id}', this.value)">
+        <option value="">— None —</option>
+        ${escortOptions.map(o => `<option value="${o.key}"${escKey===o.key?' selected':''}>${o.label}</option>`).join('')}
+      </select>
+      ${escOpt ? `<span style="font-size:0.75rem;color:var(--accent)">✓ Escorted by ${escOpt.label}</span>` : ''}
+    </div>`;
+  });
   html += `</div>`;
   return html;
 }
+
+window.setMerchantEscort = async function(shipId, escortKey) {
+  await update(cref(`/ships/${shipId}`), { escortedBy: escortKey });
+  showToast(escortKey ? 'Escort assigned' : 'Escort removed');
+};
 
 // ─── OFFICER IMAGE HELPERS ────────────────────────────────────────────────────
 function _resizeImageToDataUrl(dataUrl, w, h) {
@@ -1203,7 +1242,34 @@ const MAP_ZONE_SLOTS = {
   'Zone 7': [{x:30,y:92},{x:36,y:93},{x:22,y:92},{x:42,y:92},{x:28,y:95},{x:38,y:95},{x:18,y:94},{x:44,y:94}],
 };
 
-const MAP_PORTS = [
+// ─── MOVEMENT HELPERS ────────────────────────────────────────────────────────
+function getLocationZone(loc) {
+  const mp = MAP_PORTS_STATIC.find(p => p.name === loc);
+  if (mp) return mp.zone;
+  const m = (loc || '').match(/Zone\s*(\d+)/i);
+  return m ? parseInt(m[1]) : null;
+}
+
+function getMovementDestinations(location) {
+  const zone = getLocationZone(location);
+  if (!zone) return [];
+  const result = new Set();
+  const isPort = MAP_PORTS_STATIC.some(p => p.name === location);
+  // From port: can put to sea in same zone and adjacent zones
+  // From zone: can move to adjacent zones and enter ports in same/adjacent zone
+  for (let z = zone - 1; z <= zone + 1; z++) {
+    if (z < 1 || z > 7) continue;
+    result.add(`Zone ${z}`);
+    MAP_PORTS_STATIC.filter(p => p.zone === z).forEach(p => result.add(p.name));
+  }
+  result.delete(location);
+  return [...result].sort((a, b) => {
+    const az = getLocationZone(a) || 99, bz = getLocationZone(b) || 99;
+    return az !== bz ? az - bz : a.localeCompare(b);
+  });
+}
+
+const MAP_PORTS_STATIC = [
   { name:'Cork',        x:353, y:30,  fac:'British', zone:1, major:false },
   { name:'Plymouth',    x:458, y:123, fac:'British', zone:1, major:true  },
   { name:'Brest',       x:432, y:197, fac:'French',  zone:2, major:true  },
@@ -1237,8 +1303,10 @@ function renderMap() {
     const effectiveLoc = (s.status === 'repairing' && s.repairPort) ? s.repairPort : s.location;
     const sqn = s.squadron || '';
     const key = `${effectiveLoc}|||${s.player}|||${sqn}`;
-    if (!groups[key]) groups[key] = { location: effectiveLoc, playerId: s.player, faction: s.faction, squadron: sqn, ships: [] };
+    if (!groups[key]) groups[key] = { location: effectiveLoc, playerId: s.player, faction: s.faction, squadron: sqn, ships: [], escortKey: null };
     groups[key].ships.push({id, ...s});
+    // Track escort assignment for merchant groups
+    if (s.escortedBy) groups[key].escortKey = s.escortedBy;
   });
 
   // Simple overlap nudge: push down until clear
@@ -1255,38 +1323,62 @@ function renderMap() {
 
   const bubbles = [];
   const locCounters = {};
+  // Track escort group positions so convoys can stack below them
+  const escortPositions = {}; // escortKey → {x, y}
 
-  Object.values(groups).forEach(grp => {
+  // Two passes: non-merchant first so escort positions are known
+  const groupEntries = Object.values(groups);
+  const nonMerchant = groupEntries.filter(g => g.faction !== 'Merchant' && !MERCHANT_FACTIONS.includes(g.faction) && g.playerId !== 'merchant');
+  const merchantGroups = groupEntries.filter(g => g.faction === 'Merchant' || MERCHANT_FACTIONS.includes(g.faction) || g.playerId === 'merchant');
+
+  [...nonMerchant, ...merchantGroups].forEach(grp => {
     const loc = grp.location;
-    const idx = locCounters[loc] = (locCounters[loc] || 0);
-    locCounters[loc]++;
+    const isMerchant = grp.faction === 'Merchant' || MERCHANT_FACTIONS.includes(grp.faction) || grp.playerId === 'merchant';
 
     let x, y, atPort;
-    const portPos = MAP_PORT_POS[loc];
-    if (portPos) {
-      x = portPos.x + (idx % 2 === 0 ? -4 : 4);
-      y = portPos.y + 5 + Math.floor(idx / 2) * 4;
-      atPort = true;
-    } else {
-      const slots = MAP_ZONE_SLOTS[loc] || [];
-      const pos = slots[idx % slots.length] || { x: 30, y: 50 };
-      x = pos.x; y = pos.y; atPort = false;
+
+    // If this merchant group has an escort whose position we know, stack below it
+    if (isMerchant && grp.escortKey) {
+      const escPos = escortPositions[`${grp.location}|||${grp.escortKey}`];
+      if (escPos) {
+        x = escPos.x; y = escPos.y + 4.5; atPort = escPos.atPort;
+        placed.push({x, y});
+      }
     }
 
-    const resolved = findClear(x, y);
-    x = resolved.x; y = resolved.y;
+    if (x === undefined) {
+      const idx = locCounters[loc] = (locCounters[loc] || 0);
+      locCounters[loc]++;
+      const portPos = MAP_PORT_POS[loc];
+      if (portPos) {
+        x = portPos.x + (idx % 2 === 0 ? -4 : 4);
+        y = portPos.y + 5 + Math.floor(idx / 2) * 4;
+        atPort = true;
+      } else {
+        const slots = MAP_ZONE_SLOTS[loc] || [];
+        const pos = slots[idx % slots.length] || { x: 30, y: 50 };
+        x = pos.x; y = pos.y; atPort = false;
+      }
+      const resolved = findClear(x, y);
+      x = resolved.x; y = resolved.y;
+    }
+
+    // Record position for potential convoy stacking
+    if (!isMerchant) {
+      escortPositions[`${grp.location}|||${grp.playerId}|||${grp.squadron}`] = { x, y, atPort };
+    }
 
     const p = players[grp.playerId] || {};
-    const isMerchant = grp.faction === 'Merchant' || MERCHANT_FACTIONS.includes(grp.faction) || grp.playerId === 'merchant';
     const playerShort = (p.name || grp.playerId || '?').slice(0, 8);
     const sqnLabel = grp.squadron ? ` ${grp.squadron}` : '';
-    const label = isMerchant ? `Merchants${sqnLabel}` : `${playerShort}${sqnLabel}`;
-    const col = FC[grp.faction] || '#555';
-    const flag = isMerchant ? '' : (FACTION_FLAG[grp.faction] || '');
+    const label = isMerchant ? `⚓ Convoy${sqnLabel}` : `${playerShort}${sqnLabel}`;
+    const col = isMerchant ? '#7a6030' : (FC[grp.faction] || '#555');
+    const flag = isMerchant ? '🏴' : (FACTION_FLAG[grp.faction] || '');
     const shipCount = grp.ships.length;
     const hasRepair = grp.ships.some(s => s.status === 'repairing');
     const hasDamaged = grp.ships.some(s => s.spCurrent < s.spMax * 0.5);
-    const statusIcon = hasRepair ? ' ⚓' : hasDamaged ? ' ⚡' : '';
+    const isEscorted = isMerchant && !!grp.escortKey;
+    const statusIcon = hasRepair ? ' ⚓' : hasDamaged ? ' ⚡' : isEscorted ? ' 🛡' : '';
 
     const encodedKey = encodeURIComponent(`${grp.location}|||${grp.playerId}|||${grp.squadron}`);
     bubbles.push({ x, y, atPort, col, label, flag, shipCount, statusIcon, encodedKey });
@@ -1352,8 +1444,145 @@ window.mapGroupClick = function(encodedKey) {
     ${shipRows}
     <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:8px">
       <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+      <button class="btn btn-ghost" onclick="openMoveSquadron('${encodeURIComponent(`${loc}|||${playerId}|||${squadron}`)}')">⛵ Move</button>
       <button class="btn" onclick="closeModal();showTab('${playerId}')">Go to Player</button>
     </div>`);
+};
+
+// ─── MOVEMENT & INTERCEPTION ─────────────────────────────────────────────────
+window.openMoveSquadron = function(encodedKey) {
+  const [loc, playerId, squadron] = decodeURIComponent(encodedKey).split('|||');
+  const p = (appData.players || {})[playerId] || {};
+  const sqnLabel = squadron ? ` Squadron ${squadron}` : '';
+  const dests = getMovementDestinations(loc);
+  if (!dests.length) { showToast('No adjacent locations found'); return; }
+  const btnHtml = dests.map(d => {
+    const zone = getLocationZone(d);
+    const isZone = /^Zone/i.test(d);
+    return `<button class="btn btn-ghost" style="margin:3px;min-width:120px"
+      onclick="moveSquadron('${encodedKey}','${d}')">
+      ${isZone ? `Zone ${zone}` : `⚓ ${d}`}
+    </button>`;
+  }).join('');
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>⛵ Move ${p.name||playerId}${sqnLabel}</h2>
+    <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:10px">Currently at <strong>${loc}</strong>. Select destination:</div>
+    <div style="display:flex;flex-wrap:wrap;gap:4px">${btnHtml}</div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>`);
+};
+
+window.moveSquadron = async function(encodedKey, destination) {
+  const [loc, playerId, squadron] = decodeURIComponent(encodedKey).split('|||');
+  const ships = appData.ships || {};
+  // Find all ships in this group (non-repairing, same location/player/squadron)
+  const groupIds = Object.entries(ships).filter(([,s]) =>
+    s.location === loc && s.player === playerId && (s.squadron||'') === squadron
+    && s.status !== 'repairing' && s.status !== 'sunk' && s.status !== 'lost'
+  ).map(([id]) => id);
+  if (!groupIds.length) { showToast('No ships to move'); return; }
+  const updates = {};
+  groupIds.forEach(id => { updates[`/ships/${id}/location`] = destination; });
+  await update(cref('/'), updates);
+  closeModal();
+  showToast(`${groupIds.length} ship${groupIds.length>1?'s':''} moved to ${destination}`);
+};
+
+window.confirmMovement = async function(playerId) {
+  await update(cref('/meta/movementDone'), { [playerId]: true });
+  showToast('Movement confirmed');
+  renderCurrentTab();
+};
+
+window.openInterception = function() {
+  const ships   = appData.ships   || {};
+  const players = appData.players || {};
+  const meta    = appData.meta    || {};
+
+  // Find all zones where opposing factions have active ships
+  const zoneGroups = {}; // zone → { factionKey → [ships] }
+  Object.values(ships).forEach(s => {
+    if (s.status === 'sunk' || s.status === 'lost' || s.status === 'repairing') return;
+    const loc = s.location || '';
+    if (!loc.startsWith('Zone')) return;
+    const p = players[s.player] || {};
+    const fac = p.faction || s.faction || '';
+    if (!fac || fac === 'Merchant' || MERCHANT_FACTIONS.includes(fac)) {
+      // Merchants count as present but don't generate interception themselves
+      if (!zoneGroups[loc]) zoneGroups[loc] = {};
+      if (!zoneGroups[loc]['_merchant']) zoneGroups[loc]['_merchant'] = [];
+      zoneGroups[loc]['_merchant'].push(s);
+      return;
+    }
+    if (!zoneGroups[loc]) zoneGroups[loc] = {};
+    if (!zoneGroups[loc][fac]) zoneGroups[loc][fac] = [];
+    zoneGroups[loc][fac].push(s);
+  });
+
+  // Only zones with 2+ opposing factions (or merchant + military)
+  const contested = Object.entries(zoneGroups).filter(([, fg]) => {
+    const milFactions = Object.keys(fg).filter(f => f !== '_merchant');
+    return milFactions.length >= 2 || (milFactions.length === 1 && fg['_merchant']);
+  });
+
+  if (!contested.length) {
+    showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+      <h2>⚔ Interception</h2>
+      <div style="padding:20px 0;color:var(--text-muted);text-align:center">No contested zones — no interception checks needed.</div>
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
+    return;
+  }
+
+  let html = `<button class="modal-close" onclick="closeModal()">×</button><h2>⚔ Interception Checks</h2>
+    <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 12px">Roll 2D6 per contested zone. 7+ = interception occurs. 12 always succeeds, 2 always fails. Max ±3 modifier.</p>`;
+
+  contested.forEach(([zone, factionGroups]) => {
+    const milFacs = Object.keys(factionGroups).filter(f => f !== '_merchant');
+    const hasMerchant = !!factionGroups['_merchant'];
+    const allZoneShips = Object.values(ships).filter(s => s.location === zone && s.status === 'active');
+
+    // Calculate modifiers
+    let mod = 0, modLines = [];
+    if (hasMerchant) { mod += 2; modLines.push('+2 Merchant Convoy present'); }
+    const scouts  = allZoneShips.filter(s => s.role === 'inshoreScout').length;
+    const screens = allZoneShips.filter(s => s.role === 'squadronScreen').length;
+    const damaged = allZoneShips.some(s => (s.spCurrent||0) < (s.spMax||1) * 0.5);
+    if (scouts)  { mod += scouts;  modLines.push(`+${scouts} Inshore Scout${scouts>1?'s':''}`); }
+    if (damaged) { mod += 1;       modLines.push('+1 Ship below 50% SP'); }
+    if (screens) { mod -= screens; modLines.push(`−${screens} Squadron Screen${screens>1?'s':''}`); }
+    mod = Math.max(-3, Math.min(3, mod));
+
+    const factionList = milFacs.map(f => `${FACTION_FLAG[f]||''} ${f}`).join(' vs ');
+    const encodedZone = encodeURIComponent(zone);
+    html += `<div class="card" style="margin-bottom:10px">
+      <div style="font-weight:700;margin-bottom:4px">${zone} — ${factionList}${hasMerchant?' + Convoy':''}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:8px">
+        Modifier: <strong style="color:${mod>=0?'var(--green)':'var(--red)'}">
+          ${mod>=0?'+':''}${mod}</strong>
+        ${modLines.length ? `(${modLines.join(', ')})` : '(none)'}
+      </div>
+      <button class="btn" onclick="rollInterception('${encodedZone}', ${mod})">🎲 Roll 2D6${mod!==0?` (${mod>=0?'+':''}${mod})`:''}
+      </button>
+      <span id="iresult-${encodedZone}" style="margin-left:10px;font-size:0.9rem"></span>
+    </div>`;
+  });
+
+  html += `<div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`;
+  document.getElementById('modal-content').style.maxWidth = '600px';
+  showModal(html);
+};
+
+window.rollInterception = function(encodedZone, mod) {
+  const d1 = Math.ceil(Math.random() * 6);
+  const d2 = Math.ceil(Math.random() * 6);
+  const raw = d1 + d2;
+  const total = raw === 12 ? 12 : raw === 2 ? 2 : Math.max(2, Math.min(12, raw + mod));
+  const intercepts = total >= 7;
+  const forced = raw === 12 || raw === 2;
+  const el = document.getElementById(`iresult-${encodedZone}`);
+  if (el) {
+    const col = intercepts ? 'var(--accent)' : 'var(--text-muted)';
+    el.innerHTML = `<strong style="color:${col}">${d1}+${d2}=${raw}${mod!==0&&!forced?` (mod ${mod>=0?'+':''}${mod} → ${total})`:''} — ${intercepts?'⚔ BATTLE':'✗ Miss'}</strong>${forced?' <span style="font-size:0.75rem">(forced)</span>':''}`;
+  }
 };
 
 // ─── HISTORY ─────────────────────────────────────────────────────────────────
@@ -1541,6 +1770,20 @@ window.openCampaignModal = function() {
       <input id="cm-clone-src" placeholder="Source campaign ID (e.g. default)" style="flex:1">
       <button class="btn btn-sm" onclick="campaignClone()">Clone</button>
     </div>
+
+    <div class="section-label" style="margin-top:20px">Movement &amp; Interception</div>
+    ${(() => {
+      const players = appData.players || {};
+      const moveDone = (appData.meta || {}).movementDone || {};
+      const milPlayers = Object.entries(players).filter(([,p]) => p.faction && !MERCHANT_FACTIONS.includes(p.faction) && p.faction !== 'Merchant');
+      const allConfirmed = milPlayers.length > 0 && milPlayers.every(([pid]) => moveDone[pid]);
+      const statusLines = milPlayers.map(([pid, p]) =>
+        `<div style="font-size:0.8rem;margin:2px 0">${FACTION_FLAG[p.faction]||''} ${p.name}: ${moveDone[pid] ? '<span style="color:var(--green)">✓ Confirmed</span>' : '<span style="color:var(--text-muted)">Pending…</span>'}</div>`
+      ).join('');
+      return `${statusLines}
+        <button class="btn btn-sm" style="margin-top:8px${allConfirmed?'':';opacity:0.5'}" ${allConfirmed?'':'disabled'} onclick="openInterception()">⚔ Run Interception Checks</button>
+        ${!allConfirmed ? '<div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">All players must confirm movement first</div>' : ''}`;
+    })()}
 
     <div class="section-label" style="margin-top:20px">Campaign History</div>
     <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 8px">Turn-by-turn summary of dispatches, repairs and GM notes.</p>
@@ -1819,6 +2062,11 @@ function shipFormHtml(s) {
     </div>
     <div class="form-grid">
       <div class="form-row"><label>Crew Level</label><select id="sf-crew">${CREW_LEVELS.map(c=>`<option${s.crewLevel===c?' selected':''}>${c}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Role <span style="font-weight:normal;color:var(--text-muted);font-size:0.75rem">(interception)</span></label><select id="sf-role">
+        <option value=""${!s.role?' selected':''}>Standard</option>
+        <option value="inshoreScout"${s.role==='inshoreScout'?' selected':''}>Inshore Scout (+1)</option>
+        <option value="squadronScreen"${s.role==='squadronScreen'?' selected':''}>Squadron Screen (−1)</option>
+      </select></div>
       <div class="form-row"><label>Status</label><select id="sf-status">${STATUSES.map(st=>`<option${s.status===st?' selected':''}>${st}</option>`).join('')}</select></div>
     </div>
     <div class="form-row"><label>Battles Without Striking</label><input type="number" id="sf-battles" value="${s.battlesWithoutStriking||0}" min="0"></div>
@@ -1898,6 +2146,7 @@ function readShipForm(existing) {
     location: document.getElementById('sf-location').value,
     squadron: document.getElementById('sf-squadron').value.trim(),
     crewLevel: document.getElementById('sf-crew').value,
+    role: document.getElementById('sf-role')?.value || '',
     status: document.getElementById('sf-status').value,
     battlesWithoutStriking: parseInt(document.getElementById('sf-battles').value)||0,
     officer: document.getElementById('sf-officer').value.trim(),
