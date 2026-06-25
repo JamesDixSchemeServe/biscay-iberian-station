@@ -999,11 +999,12 @@ function renderMap() {
     x = resolved.x; y = resolved.y;
 
     const p = players[grp.playerId] || {};
+    const isMerchant = grp.faction === 'Merchant';
     const playerShort = (p.name || grp.playerId || '?').slice(0, 8);
     const sqnLabel = grp.squadron ? ` ${grp.squadron}` : '';
-    const label = `${playerShort}${sqnLabel}`;
+    const label = isMerchant ? `Merchant Convoy${sqnLabel}` : `${playerShort}${sqnLabel}`;
     const col = FC[grp.faction] || '#555';
-    const flag = FACTION_FLAG[grp.faction] || '';
+    const flag = isMerchant ? '' : (FACTION_FLAG[grp.faction] || '');
     const shipCount = grp.ships.length;
     const hasRepair = grp.ships.some(s => s.status === 'repairing');
     const hasDamaged = grp.ships.some(s => s.spCurrent < s.spMax * 0.5);
