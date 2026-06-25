@@ -1342,13 +1342,10 @@ window.mapGroupClick = function(encodedKey) {
 
 // ─── LOG ──────────────────────────────────────────────────────────────────────
 function renderRules() {
+  const pdfUrl = new URL('rules.pdf', location.href).href;
+  const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(pdfUrl)}&embedded=true`;
   return `<div style="height:calc(100vh - 120px)">
-    <iframe src="rules.pdf" style="width:100%;height:100%;border:none;display:block"
-      onerror="this.style.display='none';document.getElementById('rules-fallback').style.display='block'">
-    </iframe>
-    <div id="rules-fallback" style="display:none;padding:32px;text-align:center;color:var(--text-muted)">
-      <p>PDF not found. Add <code>rules.pdf</code> to your GitHub repository alongside <code>index.html</code>.</p>
-    </div>
+    <iframe src="${viewerUrl}" style="width:100%;height:100%;border:none;display:block"></iframe>
   </div>`;
 }
 
