@@ -284,7 +284,6 @@
     <button onclick="showTab('merchant')">Convoy</button>
     <button onclick="showTab('log')">Dispatches</button>
     <button onclick="showTab('map')">Map</button>
-    <button onclick="showTab('history')">History</button>
     <button onclick="showTab('rules')">Rules</button>
   </nav>
   <main id="main-content"></main>
@@ -580,7 +579,6 @@ function renderCurrentTab() {
       case 'merchant': c.innerHTML = renderMerchant(); break;
       case 'log':      c.innerHTML = renderLog(); break;
       case 'map':      c.innerHTML = renderMap(); break;
-      case 'history':  c.innerHTML = renderHistory(); break;
       case 'rules':    c.innerHTML = renderRules(); break;
       default:         c.innerHTML = renderOverview(); break;
     }
@@ -602,7 +600,8 @@ function rebuildNav() {
     <button class="${currentTab==='merchant'?'active':''}" onclick="showTab('merchant')">Convoy</button>
     <button class="${currentTab==='log'?'active':''}" onclick="showTab('log')">Dispatches</button>
     <button class="${currentTab==='map'?'active':''}" onclick="showTab('map')">Map</button>
-    <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>`;
+    <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>
+  `;
 }
 
 // ─── OVERVIEW ─────────────────────────────────────────────────────────────────
@@ -1543,6 +1542,10 @@ window.openCampaignModal = function() {
       <button class="btn btn-sm" onclick="campaignClone()">Clone</button>
     </div>
 
+    <div class="section-label" style="margin-top:20px">Campaign History</div>
+    <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 8px">Turn-by-turn summary of dispatches, repairs and GM notes.</p>
+    <button class="btn btn-sm" onclick="openHistory()">📜 View History</button>
+
     <div class="section-label" style="margin-top:20px">Backup</div>
     <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 8px">Download a full JSON snapshot of <strong>${campaignId}</strong>.</p>
     <button class="btn btn-sm" onclick="downloadBackup()">⬇ Download Backup</button>
@@ -1620,6 +1623,14 @@ window.campaignNew = async function() {
   if (!confirm('Start a new campaign?\n\nThis will permanently erase ALL players, ships, and dispatches. This cannot be undone.')) return;
   await set(cref('/'), { meta: { turn: 1, phase: 1 } });
   closeModal(); showToast('Campaign reset');
+};
+
+window.openHistory = function() {
+  document.getElementById('modal-content').style.maxWidth = '680px';
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>📜 Campaign History</h2>
+    ${renderHistory()}
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
 };
 
 window.downloadBackup = function() {
