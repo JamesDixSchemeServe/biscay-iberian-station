@@ -1452,7 +1452,7 @@ window.mapGroupClick = function(encodedKey) {
       const escLabel = escPlayer.name ? `${FACTION_FLAG[escPlayer.faction]||''} ${escPlayer.name}${escSqn ? ` — Squadron ${escSqn}` : ''}` : escPlayerId;
       escortLine = `<div class="stat-row"><span class="stat-label">Escorted by</span><span class="stat-value">${escLabel}</span></div>`;
       escortShips = Object.entries(ships).filter(([,s]) =>
-        s.player === escPlayerId && (s.squadron||'') === (escSqn||'') && s.location === loc
+        s.player === escPlayerId && (s.squadron||'') === (escSqn||'')
         && s.status !== 'sunk' && s.status !== 'lost' && s.status !== 'captured'
       );
     } else {
