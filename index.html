@@ -1337,31 +1337,33 @@ function renderMap() {
 
     let x, y, atPort;
 
+    let startX, startY;
+
     // If this merchant group has an escort whose position we know, stack below it
     if (isMerchant && grp.escortKey) {
       const escPos = escortPositions[`${grp.location}|||${grp.escortKey}`];
       if (escPos) {
-        x = escPos.x; y = escPos.y + 4.5; atPort = escPos.atPort;
-        placed.push({x, y});
+        startX = escPos.x; startY = escPos.y + 4.5; atPort = escPos.atPort;
       }
     }
 
-    if (x === undefined) {
+    if (startX === undefined) {
       const idx = locCounters[loc] = (locCounters[loc] || 0);
       locCounters[loc]++;
       const portPos = MAP_PORT_POS[loc];
       if (portPos) {
-        x = portPos.x + (idx % 2 === 0 ? -4 : 4);
-        y = portPos.y + 5 + Math.floor(idx / 2) * 4;
+        startX = portPos.x + (idx % 2 === 0 ? -4 : 4);
+        startY = portPos.y + 5 + Math.floor(idx / 2) * 4;
         atPort = true;
       } else {
         const slots = MAP_ZONE_SLOTS[loc] || [];
         const pos = slots[idx % slots.length] || { x: 30, y: 50 };
-        x = pos.x; y = pos.y; atPort = false;
+        startX = pos.x; startY = pos.y; atPort = false;
       }
-      const resolved = findClear(x, y);
-      x = resolved.x; y = resolved.y;
     }
+
+    const resolved = findClear(startX, startY);
+    x = resolved.x; y = resolved.y;
 
     // Record position for potential convoy stacking
     if (!isMerchant) {
@@ -1371,14 +1373,13 @@ function renderMap() {
     const p = players[grp.playerId] || {};
     const playerShort = (p.name || grp.playerId || '?').slice(0, 8);
     const sqnLabel = grp.squadron ? ` ${grp.squadron}` : '';
-    const label = isMerchant ? `⚓ Convoy${sqnLabel}` : `${playerShort}${sqnLabel}`;
+    const label = isMerchant ? `Convoy${sqnLabel}` : `${playerShort}${sqnLabel}`;
     const col = isMerchant ? '#7a6030' : (FC[grp.faction] || '#555');
-    const flag = isMerchant ? '🏴' : (FACTION_FLAG[grp.faction] || '');
+    const flag = FACTION_FLAG[grp.faction] || '';
     const shipCount = grp.ships.length;
     const hasRepair = grp.ships.some(s => s.status === 'repairing');
     const hasDamaged = grp.ships.some(s => s.spCurrent < s.spMax * 0.5);
-    const isEscorted = isMerchant && !!grp.escortKey;
-    const statusIcon = hasRepair ? ' ⚓' : hasDamaged ? ' ⚡' : isEscorted ? ' 🛡' : '';
+    const statusIcon = hasRepair ? ' ⚓' : hasDamaged ? ' ⚡' : '';
 
     const encodedKey = encodeURIComponent(`${grp.location}|||${grp.playerId}|||${grp.squadron}`);
     bubbles.push({ x, y, atPort, col, label, flag, shipCount, statusIcon, encodedKey });
@@ -2063,7 +2064,7 @@ function shipFormHtml(s) {
     <div class="form-grid">
       <div class="form-row"><label>Crew Level</label><select id="sf-crew">${CREW_LEVELS.map(c=>`<option${s.crewLevel===c?' selected':''}>${c}</option>`).join('')}</select></div>
       <div class="form-row"><label>Role <span style="font-weight:normal;color:var(--text-muted);font-size:0.75rem">(interception)</span></label><select id="sf-role">
-        <option value=""${!s.role?' selected':''}>Standard</option>
+        <option value=""${!s.role?' selected':''}>Squadron</option>
         <option value="inshoreScout"${s.role==='inshoreScout'?' selected':''}>Inshore Scout (+1)</option>
         <option value="squadronScreen"${s.role==='squadronScreen'?' selected':''}>Squadron Screen (−1)</option>
       </select></div>
@@ -2602,6 +2603,18 @@ window.saveNewShip = async function() {
 window.saveShip = async function(id) {
   const existing = (appData.ships || {})[id];
   const data = readShipForm(existing);
+
+  // Validate squadron zone consistency
+  if (data.squadron && data.location) {
+    const sqnPeers = Object.entries(appData.ships || {}).filter(([sid, s]) =>
+      sid !== id && s.player === data.player && s.squadron === data.squadron
+      && s.status !== 'sunk' && s.status !== 'lost' && s.status !== 'repairing'
+    );
+    if (sqnPeers.length > 0 && sqnPeers[0][1].location !== data.location) {
+      showToast(`Squadron ${data.squadron} is at ${sqnPeers[0][1].location} — move this ship there first`);
+      return;
+    }
+  }
 
   // Log previous name if renamed
   if (data.name && data.name !== existing.name) {
