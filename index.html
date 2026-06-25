@@ -958,50 +958,6 @@ window.uploadOfficerImage = function(type, pid) {
   input.click();
 };
 
-window.generateOfficerImage = async function(type, pid) {
-  const apiKey = localStorage.getItem('bs_openai_key');
-  if (!apiKey) { showToast('Add your OpenAI API key in Campaign Management first'); return; }
-  const p = (appData.players || {})[pid];
-  if (!p) return;
-  const officerName = p.officerName || p.name || 'Unknown Officer';
-  const faction = p.faction || 'British';
-  const waxDesc = { British: 'deep crimson red wax', French: 'dark navy blue wax', Spanish: 'aged dark gold wax' }[faction] || 'dark brown wax';
-
-  const prompt = type === 'seal'
-    ? `A period-accurate 18th century naval wax seal, circular, viewed directly from above. ${waxDesc}, ornate design featuring a naval anchor, crown, and decorative rope border. Realistic cracked wax texture with natural imperfections. Isolated on a plain white background. Photorealistic, top-down view, no shadows on background.`
-    : `An ornate 18th century handwritten cursive signature reading exactly "${officerName}". Written with a quill pen in dark sepia-brown ink. Extremely florid and elaborate calligraphy in the style of Napoleonic-era naval correspondence, with long flourishing descenders and ascenders. Isolated on a plain white background. No other text, no lines, no paper texture.`;
-
-  const btnId = `gen-btn-${type}-${pid}`;
-  const btn = document.getElementById(btnId);
-  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
-
-  try {
-    const resp = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt,
-        n: 1,
-        size: type === 'seal' ? '1024x1024' : '1792x1024',
-        response_format: 'b64_json',
-      }),
-    });
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.error?.message || resp.statusText); }
-    const data = await resp.json();
-    const rawUrl = `data:image/png;base64,${data.data[0].b64_json}`;
-    const [w, h] = type === 'seal' ? [220, 220] : [400, 130];
-    const resized = await _resizeImageToDataUrl(rawUrl, w, h);
-    const field = type === 'seal' ? 'sealUrl' : 'signatureUrl';
-    await update(cref(`/players/${pid}`), { [field]: resized });
-    showToast(type === 'seal' ? 'Seal generated!' : 'Signature generated!');
-    _refreshOfficerPreview(type, pid, resized);
-  } catch(err) {
-    showToast(`Generation failed: ${err.message}`);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'AI Generate'; }
-  }
-};
 
 function _refreshOfficerPreview(type, pid, dataUrl) {
   const emptyEl = document.getElementById(`officer-${type}-empty-${pid}`);
@@ -1377,24 +1333,12 @@ window.openCampaignModal = function() {
       <button class="btn btn-sm" onclick="campaignCreate()">Create</button>
     </div>
 
-    <div class="section-label" style="margin-top:20px">OpenAI (Image Generation)</div>
-    <p style="font-size:0.8rem;color:var(--text-muted);margin:0 0 8px">Used to generate officer seals &amp; signatures via DALL·E 3. Key is stored in this browser only and never sent anywhere except OpenAI.</p>
-    <div style="display:flex;gap:8px">
-      <input id="cm-openai" type="password" placeholder="sk-…" value="${localStorage.getItem('bs_openai_key')||''}" style="flex:1;font-family:monospace">
-      <button class="btn btn-sm" onclick="saveOpenAiKey()">Save Key</button>
-    </div>
-
     <div class="section-label" style="margin-top:20px;color:var(--red)">Reset This Campaign</div>
     <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 10px">Wipe all players, ships, and dispatches for <strong>${campaignId}</strong>.</p>
     <button class="btn btn-danger" onclick="campaignNew()">Reset Campaign</button>
   `);
 };
 
-window.saveOpenAiKey = function() {
-  const key = document.getElementById('cm-openai').value.trim();
-  if (key) { localStorage.setItem('bs_openai_key', key); showToast('OpenAI key saved'); }
-  else { localStorage.removeItem('bs_openai_key'); showToast('OpenAI key cleared'); }
-};
 
 window.campaignSwitch = function() {
   const id = document.getElementById('cm-switch').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
@@ -1469,9 +1413,8 @@ window.showPlayerModal = function(pid) {
             ? `<img id="officer-seal-preview-${pid}" src="${p.sealUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
             : `<span id="officer-seal-empty-${pid}" style="font-size:0.7rem;color:var(--text-muted);text-align:center;padding:6px">No seal</span>`}
         </div>
-        <div style="display:flex;gap:4px;margin-top:8px;flex-wrap:wrap">
+        <div style="margin-top:8px">
           <button class="btn btn-ghost btn-sm" onclick="uploadOfficerImage('seal','${pid}')">Upload</button>
-          <button class="btn btn-ghost btn-sm" id="gen-btn-seal-${pid}" onclick="generateOfficerImage('seal','${pid}')">AI Generate</button>
         </div>
       </div>
       <div style="flex:1;min-width:200px">
@@ -1481,9 +1424,8 @@ window.showPlayerModal = function(pid) {
             ? `<img id="officer-signature-preview-${pid}" src="${p.signatureUrl}" style="max-width:100%;max-height:100%;object-fit:contain">`
             : `<span id="officer-signature-empty-${pid}" style="font-size:0.7rem;color:var(--text-muted)">No signature</span>`}
         </div>
-        <div style="display:flex;gap:4px;margin-top:8px">
+        <div style="margin-top:8px">
           <button class="btn btn-ghost btn-sm" onclick="uploadOfficerImage('signature','${pid}')">Upload</button>
-          <button class="btn btn-ghost btn-sm" id="gen-btn-signature-${pid}" onclick="generateOfficerImage('signature','${pid}')">AI Generate</button>
         </div>
       </div>
     </div>
