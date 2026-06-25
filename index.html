@@ -1324,19 +1324,25 @@ function renderMap() {
     if (s.escortedBy) groups[key].escortKey = s.escortedBy;
   });
 
-  // Find naval groups that are actively escorting a convoy in the same zone — suppress their own bubble
+  // Find naval groups that are actively escorting a convoy — suppress their own bubble
   const suppressedKeys = new Set();
-  Object.values(groups).forEach(grp => {
-    if (grp.escortKey) {
-      const [escPlayerId, escSqn] = grp.escortKey.split('|||');
-      const navalKey = `${grp.location}|||${escPlayerId}|||${escSqn||''}`;
-      if (groups[navalKey]) {
-        suppressedKeys.add(navalKey);
-        grp.escortShips = groups[navalKey].ships;
-        grp.escortFaction = groups[navalKey].faction;
-        grp.escortPlayerId = escPlayerId;
-        grp.escortSqn = escSqn;
-      }
+  Object.entries(groups).forEach(([merchantKey, grp]) => {
+    if (!grp.escortKey) return;
+    const [escPlayerId, escSqn] = grp.escortKey.split('|||');
+    // Try exact location match first, then search all locations for this player+squadron
+    const exactKey = `${grp.location}|||${escPlayerId}|||${escSqn||''}`;
+    const navalKey = groups[exactKey]
+      ? exactKey
+      : Object.keys(groups).find(k => {
+          const [, pid, sqn] = k.split('|||');
+          return pid === escPlayerId && sqn === (escSqn||'');
+        });
+    if (navalKey && groups[navalKey]) {
+      suppressedKeys.add(navalKey);
+      grp.escortShips = groups[navalKey].ships;
+      grp.escortFaction = groups[navalKey].faction;
+      grp.escortPlayerId = escPlayerId;
+      grp.escortSqn = escSqn;
     }
   });
 
