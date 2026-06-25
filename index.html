@@ -927,12 +927,10 @@ function _resizeImageToDataUrl(dataUrl, w, h) {
       const c = document.createElement('canvas');
       c.width = w; c.height = h;
       const ctx = c.getContext('2d');
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, w, h);
       const scale = Math.min(w / img.width, h / img.height);
       const sw = img.width * scale, sh = img.height * scale;
       ctx.drawImage(img, (w - sw) / 2, (h - sh) / 2, sw, sh);
-      resolve(c.toDataURL('image/jpeg', 0.82));
+      resolve(c.toDataURL('image/png'));
     };
     img.src = dataUrl;
   });
