@@ -38,7 +38,8 @@
   nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; gap: 2px; padding: 0 8px; }
   nav button { background: none; border: none; color: var(--text-muted); padding: 10px 14px; font-family: var(--font); font-size: 0.85rem; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; transition: all 0.2s; }
   nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
-  nav button:hover:not(.active) { color: var(--text); }
+  nav button:hover:not(.active):not(.disabled) { color: var(--text); }
+  nav button.disabled { opacity: 0.45; cursor: not-allowed; }
 
   /* Main content */
   main { padding: 16px; max-width: 900px; margin: 0 auto; }
@@ -877,9 +878,10 @@ function renderFaction(faction) {
         const bySquadron = {};
         active.forEach(([id,s]) => { const sq = s.squadron || '(no squadron)'; (bySquadron[sq]||(bySquadron[sq]=[])).push([id,s]); });
         for (const [sq, sqs] of Object.entries(bySquadron)) {
+          sqs.sort(([,a],[,b]) => (a.sortOrder??9999) - (b.sortOrder??9999));
           if (sq !== '(no squadron)') html += `<div class="section-label">Squadron ${sq}</div>`;
           else html += `<div class="section-label">Individual / Detached</div>`;
-          html += `<div class="ship-list">${sqs.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+          html += `<div class="ship-list" data-sqnkey="${pid}|||${sq}">${sqs.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
         }
       }
     }
@@ -2299,6 +2301,7 @@ window.showPlayerModal = function(pid) {
     <h2>${p.name} – ${p.faction}</h2>
     <div class="form-row"><label>Player Name</label><input id="pm-name" value="${p.name}"></div>
     <div class="form-row"><label>Officer Name</label><input id="pm-officer" value="${p.officerName||''}"></div>
+    <div class="form-row"><label>Faction</label><select id="pm-faction">${FACTIONS.map(f=>`<option value="${f}"${p.faction===f?' selected':''}>${FACTION_FLAG[f]||''} ${f}</option>`).join('')}</select></div>
     <div class="form-row"><label>Rank</label><select id="pm-rank">${RANKS.map(r=>`<option${p.rank===r?' selected':''}>${r}</option>`).join('')}</select></div>
     <div class="form-row"><label>Resources</label>
       <div class="res-edit">
@@ -2380,6 +2383,7 @@ window.savePlayer = async function(pid) {
   await update(cref(`/players/${pid}`), {
     name: document.getElementById('pm-name').value.trim(),
     officerName: document.getElementById('pm-officer').value.trim(),
+    faction: document.getElementById('pm-faction').value,
     rank: document.getElementById('pm-rank').value,
     resources: parseInt(document.getElementById('pm-res').value)||0,
     admiraltyFavour: parseInt(document.getElementById('pm-favour').value)||0,
@@ -2935,19 +2939,20 @@ window.openHistoricalSearch = function() {
   };
 
   const nations = [...new Set(HISTORICAL_SHIP_DB.map(s => s.nation))].sort();
-  showModal(`<button class="modal-close" onclick="closeModal()">�</button>
-    <h2>🔍 Find Historical Ship</h2>
+  const preNation = _asFaction || '';
+  showModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    <h2>&#x1F50D; Find Historical Ship</h2>
     <div style="display:flex;gap:8px;margin-bottom:10px">
-      <input id="hs-query" placeholder="Search by name or type�" style="flex:1" oninput="(function(){const q=document.getElementById('hs-query').value,n=document.getElementById('hs-nation').value;window._hsRender(q,n)})()">
+      <input id="hs-query" placeholder="Search by name or type..." style="flex:1" oninput="(function(){const q=document.getElementById('hs-query').value,n=document.getElementById('hs-nation').value;window._hsRender(q,n)})()">
       <select id="hs-nation" onchange="(function(){const q=document.getElementById('hs-query').value,n=document.getElementById('hs-nation').value;window._hsRender(q,n)})()">
-        <option value="">All nations</option>
-        ${nations.map(n=>`<option value="${n}">${n}</option>`).join('')}
+        <option value=""${!preNation?' selected':''}>All nations</option>
+        ${nations.map(n=>`<option value="${n}"${n===preNation?' selected':''}>${n}</option>`).join('')}
       </select>
     </div>
     <div id="hs-results" style="max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:6px"></div>
   `);
   window._hsRender = renderResults;
-  renderResults('', '');
+  renderResults('', preNation);
 };
 
 window.applyHistoricalShip = function(id) {
