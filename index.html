@@ -934,24 +934,25 @@ function _defaultRig(type) {
   return 'Square';
 }
 function initShipDrag() {
-  let dragId = null, dragEl = null;
+  let dragId = null, dragEl = null, dragSrcList = null;
   document.querySelectorAll('[data-sqnkey]').forEach(list => {
     list.addEventListener('dragstart', e => {
       const card = e.target.closest('[data-shipid]');
       if (!card) return;
       dragId = card.dataset.shipid;
       dragEl = card;
+      dragSrcList = list;
       e.dataTransfer.effectAllowed = 'move';
       setTimeout(() => card.style.opacity = '0.4', 0);
     });
     list.addEventListener('dragend', e => {
       const card = e.target.closest('[data-shipid]');
       if (card) card.style.opacity = '';
-      dragEl = null;
+      dragEl = null; dragSrcList = null;
     });
     list.addEventListener('dragover', e => {
       e.preventDefault();
-      if (!dragEl) return;
+      if (!dragEl || list !== dragSrcList) return;
       const card = e.target.closest('[data-shipid]');
       if (!card || card === dragEl) return;
       const mid = card.getBoundingClientRect().top + card.getBoundingClientRect().height / 2;
@@ -959,7 +960,7 @@ function initShipDrag() {
     });
     list.addEventListener('drop', async e => {
       e.preventDefault();
-      if (!dragId) return;
+      if (!dragId || list !== dragSrcList) return;
       const orderedIds = [...list.querySelectorAll('[data-shipid]')].map(el => el.dataset.shipid);
       const updates = {};
       orderedIds.forEach((id, i) => { updates[`/ships/${id}/sortOrder`] = i; });
