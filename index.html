@@ -2583,8 +2583,18 @@ function shipFormHtml(s) {
     <div class="form-row"><label>Officer Assigned</label><select id="sf-officer">${officerOpts}</select></div>
     <div class="form-row"><label>Repair Port</label><select id="sf-repairPort" onchange="recalcRepairCost()">${repairPortOpts}</select></div>
     <div id="repair-cost-breakdown" style="font-size:0.78rem;color:var(--text-muted);margin:-4px 0 8px;padding:6px 8px;background:var(--surface2);border-radius:4px;display:none"></div>
-    <div class="form-row"><label>Repair Cost <span style="font-weight:normal;color:var(--text-muted)">(auto-calculated)</span></label><input type="number" id="sf-repairCost" value="${s.repairCostPaid||0}" readonly style="background:var(--surface2);color:var(--accent);font-weight:bold"></div>
-    <div class="form-row"><label>Available in Turn</label><input id="sf-available" value="${s.availableIn||''}"></div>
+    <div class="form-row" style="align-items:center">
+      <label>Repair Cost
+        <button type="button" id="sf-repairCost-lock" onclick="toggleRepairLock('repairCost')" title="Override auto-calculation" style="margin-left:6px;padding:1px 6px;font-size:0.7rem;border:1px solid var(--border);border-radius:3px;background:var(--surface2);color:var(--text-muted);cursor:pointer;vertical-align:middle">🔒 auto</button>
+      </label>
+      <input type="number" id="sf-repairCost" value="${s.repairCostPaid||0}" readonly style="background:var(--surface2);color:var(--accent);font-weight:bold">
+    </div>
+    <div class="form-row" style="align-items:center">
+      <label>Available in Turn
+        <button type="button" id="sf-available-lock" onclick="toggleRepairLock('available')" title="Override auto-calculation" style="margin-left:6px;padding:1px 6px;font-size:0.7rem;border:1px solid var(--border);border-radius:3px;background:var(--surface2);color:var(--text-muted);cursor:pointer;vertical-align:middle">🔒 auto</button>
+      </label>
+      <input id="sf-available" value="${s.availableIn||''}">
+    </div>
     <div id="sf-capture-section" style="display:none">
       <div id="sf-capture-info" style="margin-bottom:8px;padding:8px 10px;border-radius:6px;font-size:0.82rem"></div>
       <div class="form-row"><label id="sf-enemy-label">Enemy Ship</label><select id="sf-enemyShip">
@@ -2726,6 +2736,33 @@ window.removeStructDamage = function(index) {
   recalcRepairCost();
 };
 
+window.toggleRepairLock = function(field) {
+  const input = document.getElementById(`sf-${field}`);
+  const btn   = document.getElementById(`sf-${field}-lock`);
+  if (!input || !btn) return;
+  const locked = input.dataset.overridden === 'true';
+  if (locked) {
+    // return to auto
+    input.dataset.overridden = 'false';
+    input.readOnly = field === 'repairCost';
+    input.style.background = field === 'repairCost' ? 'var(--surface2)' : '';
+    input.style.color = field === 'repairCost' ? 'var(--accent)' : '';
+    btn.textContent = '🔒 auto';
+    btn.style.color = 'var(--text-muted)';
+    recalcRepairCost();
+  } else {
+    // unlock for manual entry
+    input.dataset.overridden = 'true';
+    input.readOnly = false;
+    input.style.background = 'var(--surface)';
+    input.style.color = 'var(--text)';
+    btn.textContent = '✏️ manual';
+    btn.style.color = 'var(--accent)';
+    input.focus();
+    input.select();
+  }
+};
+
 window.recalcRepairCost = function() {
   const portEl    = document.getElementById('sf-repairPort');
   const spCurEl   = document.getElementById('sf-spCurrent');
@@ -2746,7 +2783,7 @@ window.recalcRepairCost = function() {
 
   if (!port) {
     // Roadstead — free jury rig
-    costEl.value = 0;
+    if (costEl.dataset.overridden !== 'true') costEl.value = 0;
     if (breakdown) {
       breakdown.style.display = 'block';
       const shipId = breakdown.dataset.shipId || '';
@@ -2783,11 +2820,13 @@ window.recalcRepairCost = function() {
   const travelTurns = (shipZone && portZone && Math.abs(shipZone - portZone) > 1) ? 1 : 0;
   const totalTurns = repairTurns + travelTurns;
 
-  costEl.value = total;
+  if (document.getElementById('sf-repairCost')?.dataset.overridden !== 'true') {
+    costEl.value = total;
+  }
 
   const currentTurn = (appData.meta || {}).turn || 1;
   const availEl = document.getElementById('sf-available');
-  if (availEl) {
+  if (availEl && availEl.dataset.overridden !== 'true') {
     availEl.value = totalTurns > 0 ? `Turn ${currentTurn + totalTurns}` : '';
   }
 
