@@ -1752,7 +1752,7 @@ function renderInterceptionTab() {
       return `<div class="card" style="margin-bottom:6px;font-size:0.85rem;display:flex;gap:12px;align-items:center">
         <span style="color:var(--text-muted);min-width:60px">${r.zone}</span>
         <span>${r.seekerName} vs ${r.targetName}</span>
-        <span style="margin-left:auto;white-space:nowrap"><strong style="color:${col}">${r.d1}+${r.d2}=${r.raw}${modNote} — ${r.intercepts?'⚔ BATTLE':'✗ No intercept'}</strong></span>
+        <span style="margin-left:auto;white-space:nowrap"><strong style="color:${col}">${r.chosen ? '⚔ BATTLE (chosen)' : `${r.d1}+${r.d2}=${r.raw}${modNote} — ${r.intercepts?'⚔ BATTLE':'✗ No intercept'}`}</strong></span>
       </div>`;
     }).join('')}` : '';
 
@@ -1813,14 +1813,17 @@ function renderInterceptionTab() {
           const col = r.intercepts ? 'var(--accent)' : 'var(--text-muted)';
           const modNote = r.mod !== 0 ? ` (${r.mod>=0?'+':''}${r.mod} → ${r.total})` : '';
           const forced = r.raw === 12 || r.raw === 2;
+          const label = r.chosen ? '⚔ BATTLE (chosen)' : r.intercepts ? '⚔ BATTLE' : '✗ No intercept';
+          const rollText = r.chosen ? '' : `${r.d1}+${r.d2}=${r.raw}${modNote} — `;
           return `<div style="padding:6px 10px;border-radius:6px;background:var(--surface2);font-size:0.88rem">
-            <strong style="color:${col}">${r.d1}+${r.d2}=${r.raw}${modNote} — ${r.intercepts?'⚔ BATTLE':'✗ No intercept'}</strong>
+            <strong style="color:${col}">${rollText}${label}</strong>
             ${forced?`<span style="font-size:0.75rem;color:var(--text-muted);margin-left:6px">(forced)</span>`:''}
             <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px">${r.seekerName} vs ${r.targetName}</div>
           </div>`;
         })() : '';
         return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <button class="btn" onclick="rollInterception('${zoneId}')">🎲 Roll 2D6</button>
+          <button class="btn btn-ghost" onclick="chooseBattle('${zoneId}')">⚔ Choose Battle</button>
           ${resultHtml}
         </div>`;
       })()}
@@ -1991,6 +1994,56 @@ window.rollInterception = function(zoneId) {
 
   update(cref('/'), updates);
   // onValue re-render will pick up used state and show the new log entry
+};
+
+window.chooseBattle = function(zoneId) {
+  const zone = zoneId.replace(/_/g,' ');
+  const sqns = (window._interceptZoneData || {})[zone] || [];
+  const seekKey = decodeURIComponent(document.getElementById(`iseek-${zoneId}`)?.value || '');
+  const tgtKey  = decodeURIComponent(document.getElementById(`itgt-${zoneId}`)?.value  || '');
+  const seekEntry = sqns.find(e => e.key === seekKey);
+  const tgtEntry  = tgtKey === '__merchant__' ? null : sqns.find(e => e.key === tgtKey);
+
+  if (!seekKey || !tgtKey) { showToast('Select both squadrons before choosing battle'); return; }
+  if (seekEntry && tgtEntry && (areAllied(seekEntry.faction, tgtEntry.faction) || seekEntry.player === tgtEntry.player)) {
+    showToast('Cannot choose battle between allied or same-player squadrons'); return;
+  }
+
+  if (!appData.meta) appData.meta = {};
+  if (!appData.meta.interceptionUsed) appData.meta.interceptionUsed = {};
+  const updates = {};
+
+  const markUsed = key => {
+    const fbKey = key.replace(/\|/g,'_');
+    updates[`/meta/interceptionUsed/${fbKey}`] = true;
+    appData.meta.interceptionUsed[fbKey] = true;
+  };
+
+  if (seekKey) markUsed(seekKey);
+  if (tgtKey && tgtKey !== '__merchant__') markUsed(tgtKey);
+
+  const rolePool = (window._interceptRoleShips || {})[zone] || {};
+  if (seekEntry) {
+    (rolePool[seekEntry.player] || []).filter(s => s.role === 'inshoreScout').forEach(s => markUsed(`${s.player}|||${s.id}`));
+  }
+  if (tgtEntry) {
+    (rolePool[tgtEntry.player] || []).filter(s => s.role === 'squadronScreen').forEach(s => markUsed(`${s.player}|||${s.id}`));
+  }
+
+  const turn = (appData.meta || {}).turn || 1;
+  const logEntry = {
+    zone, turn, d1: 0, d2: 0, raw: 0, total: 0, mod: 0, intercepts: true, chosen: true,
+    seekerName: seekEntry ? `${seekEntry.playerName}${seekEntry.squadron ? ` Sqn ${seekEntry.squadron}` : ''}` : seekKey,
+    targetName: tgtKey === '__merchant__' ? 'Merchant Convoy' : (tgtEntry ? `${tgtEntry.playerName}${tgtEntry.squadron ? ` Sqn ${tgtEntry.squadron}` : ''}` : tgtKey),
+  };
+  if (!appData.meta.interceptionLog) appData.meta.interceptionLog = {};
+  const existingLog = appData.meta.interceptionLog[turn];
+  if (!Array.isArray(existingLog)) appData.meta.interceptionLog[turn] = Object.values(existingLog || {});
+  const logIdx = appData.meta.interceptionLog[turn].length;
+  updates[`/meta/interceptionLog/${turn}/${logIdx}`] = logEntry;
+  appData.meta.interceptionLog[turn].push(logEntry);
+
+  update(cref('/'), updates);
 };
 
 // ─── HISTORY ─────────────────────────────────────────────────────────────────
@@ -2438,7 +2491,7 @@ window.generateMission = function(zone) {
   if (!out) return;
 
   out.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:22px;max-width:700px">
+    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:22px">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
         <span style="font-size:1.6rem">${mission.icon}</span>
         <div>
