@@ -2306,7 +2306,7 @@ function renderOrders() {
     html += `<div style="background:var(--surface);border:1px solid ${contested?'var(--accent)':'var(--border)'};border-radius:8px;padding:14px">
       <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${contested?'var(--accent)':'var(--text)'};margin-bottom:8px">${zone} ${contested?'<span style="font-size:0.7rem;color:var(--accent)">(contested)</span>':''}</div>
       ${Object.entries(factionGroups).map(([f, ss]) => `<div style="font-size:0.8rem;color:var(--text-muted)">${FACTION_FLAG[f]||''} ${f}: ${ss.length} ship${ss.length!==1?'s':''}</div>`).join('')}
-      ${contested ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" onclick="generateMission(${JSON.stringify(zone)})">Generate Mission</button>` : ''}
+      ${contested ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" data-zone="${zone.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.zone)">Generate Mission</button>` : ''}
     </div>`;
   });
   html += `</div>`;
@@ -2365,7 +2365,7 @@ window.generateMission = function(zone) {
           <div style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--accent)">${mission.name}</div>
           <div style="font-size:0.78rem;color:var(--text-muted)">${zone} · Turn ${(appData.meta||{}).turn||1}</div>
         </div>
-        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="generateMission(${JSON.stringify(zone)})">🎲 Regenerate</button>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-zone="${zone.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.zone)">🎲 Regenerate</button>
       </div>
 
       <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}</p>
