@@ -2176,13 +2176,33 @@ const MISSION_TYPES = [
     icon: '⚔',
     weight: 20,
     flavour: {
-      fair:     ['Both squadrons have been sighted in the offing under a clear sky. There is no avoiding a general engagement — the honour of the flag demands it.',
-                 'The enemy rides clearly on the horizon in the morning light. Signals fly from the flagship: "Engage the enemy more closely."'],
-      foul:     ['In the teeth of the gale, both squadrons close on each other. Spray lashes the gun crews as the range falls. There is no turning back now.',
-                 'The storm has thrown the squadrons together. Fighting in these seas will be bloody work — but the order is given.'],
-      obscured: ['The fog has brought the squadrons to within pistol shot before either raised the alarm. In this murk, it will be savage, close-range work.',
-                 'Muffled gunfire through the fog. The enemy is somewhere close — the order goes out to beat to quarters.'],
-      default:  ['Intelligence places the opposing force directly across our intended course. A decisive action cannot be avoided.'],
+      1: {
+        fair:     ['Both vessels have been sighted in the offing under a clear sky. Neither captain can afford to show his colours and stand away.',
+                   'A chance encounter in open water — neither side expected it, and neither will back down now.'],
+        foul:     ['The weather has thrown the two vessels together. A sharp, bloody skirmish in these seas is no one\'s idea of glory — but here we are.',
+                   'In the confusion of the squall, the two vessels have closed to within hailing distance. There is no way out but through.'],
+        obscured: ['The fog has done its work. Two vessels, blind and close, suddenly aware of each other. In this murk it will be brutal and short.',
+                   'A shape looms out of the haze — too close to run, too dangerous to ignore. Hands to quarters.'],
+        default:  ['A chance encounter in open water. Neither captain can afford to show his colours and stand away.'],
+      },
+      2: {
+        fair:     ['Both squadrons have been sighted in the offing under a clear sky. There is no avoiding a general engagement — the honour of the flag demands it.',
+                   'The enemy rides clearly on the horizon in the morning light. Signals fly from the flagship: "Engage the enemy more closely."'],
+        foul:     ['In the teeth of the gale, both squadrons close on each other. Spray lashes the gun crews as the range falls. There is no turning back now.',
+                   'The storm has thrown the squadrons together. Fighting in these seas will be bloody work — but the order is given.'],
+        obscured: ['The fog has brought the squadrons to within pistol shot before either raised the alarm. In this murk, it will be savage, close-range work.',
+                   'Muffled gunfire through the fog. The enemy is somewhere close — the order goes out to beat to quarters.'],
+        default:  ['Intelligence places the opposing force directly across our intended course. A decisive action cannot be avoided.'],
+      },
+      3: {
+        fair:     ['The line is formed and the range is closing. Signals fly from the flagship as both squadrons prepare for a general action.',
+                   'Under a clear sky, the squadrons have been brought to battle. What follows will be watched by every admiral on both sides.'],
+        foul:     ['In heavy weather the squadrons close for action. Fighting in these seas will be punishing work — but the orders leave no discretion.',
+                   'The storm has not deterred either commander. In the teeth of the gale, the range falls and the guns are run out.'],
+        obscured: ['The fog has closed the range before either side intended. At this distance, with these ships, the damage will be severe.',
+                   'Muffled thunder through the murk — the two squadrons have found each other. At this phase of the war, there is no turning away.'],
+        default:  ['Both squadrons have been brought to battle. What follows will be felt well beyond these waters.'],
+      },
     },
     deploy: () => '',
     goal: { attacker: 'Sink or capture the majority of the enemy force.', defender: 'Inflict maximum damage and disengage in good order.' },
@@ -2204,7 +2224,7 @@ const MISSION_TYPES = [
     deploy: () => 'Squadrons deploy on opposite short table edges. Merchant vessel deploys within 6″ of the escorting squadron.',
     merchants: [
       { name: 'Small Merchant', type: 'Merchantman', sp: 20, broadside: '1L', rok: 4, value: 50, weight: 40, rig: 'Square', crew: 'Inexperienced', special: null },
-      { name: 'Large Merchant', type: 'Merchantman', sp: 30, broadside: '2L', rok: 4, value: 100, weight: 35, rig: 'Square', crew: 'Inexperienced', special: null },
+      { name: 'Large Merchant', type: 'Merchantman', sp: 30, broadside: '2L', rok: 4, value: 100, weight: 35, rig: 'Square', crew: 'Inexperienced', size: 'L', special: null },
       { name: 'Powder Ship',    type: 'Indiaman',    sp: 30, broadside: '—',  rok: 4, value: 150, weight: 25, rig: 'Square', crew: 'Inexperienced', special: 'POWDER SHIP: Any damage — roll a D6. On a natural 1, the ship explodes causing 2D10 damage to all ships within 10″ and D10 to all ships within 10″–20″.' },
     ],
     goal: { attacker: 'Destroy or capture the designated merchant vessel before she reaches safety.', defender: 'Escort the merchant to safety — she must not be taken or sunk.' },
@@ -2229,8 +2249,8 @@ const MISSION_TYPES = [
     icon: '📜',
     weight: 14,
     flavour: {
-      fair:     ['A fast sloop is clearly visible, making all sail for the harbour. The despatches she carries must not arrive.',
-                 'In clear weather there is nowhere to hide — the courier sloop has been sighted and the chase is on.'],
+      fair:     ['A fast cutter is clearly visible, making all sail for the harbour. The despatches she carries must not arrive.',
+                 'In clear weather there is nowhere to hide — the dispatch cutter has been sighted and the chase is on.'],
       foul:     ['In these heavy seas the courier sloop labours, slower than she should be. Intelligence confirms she carries the Admiral\'s despatches — and we are gaining.',
                  'The nominated vessel carries sealed orders that must not fall into enemy hands. In this weather, her escorts will struggle to keep station.'],
       obscured: ['A vessel is sighted through the haze, making for port under press of sail. Intelligence confirms she carries despatches of the utmost importance.',
@@ -2238,7 +2258,7 @@ const MISSION_TYPES = [
       default:  ['Intelligence has reached us that the enemy courier is at sea. Intercept her before she delivers her despatches.'],
     },
     deploy: () => '',
-    vessel: { name: 'Dispatch Cutter', type: 'Cutter', sp: 13, broadside: '1L', rok: 6, rig: 'Fore-and-aft', crew: 'Regular', size: 'T', breakpoint: 3 },
+    vessel: { name: 'Dispatch Cutter', type: 'Cutter', sp: 13, broadside: '1L', rok: 6, rig: 'Fore-and-aft', crew: 'Regular', size: 'S', breakpoint: 3 },
     goal: { attacker: 'Intercept and capture the nominated target vessel before she escapes.', defender: 'Get the nominated vessel off the far table edge intact.' },
   },
   {
@@ -2373,10 +2393,16 @@ function _weatherCategory(w) {
   return 'foul';
 }
 
-function _pickFlavour(mission, weather) {
+function _pickFlavour(mission, weather, phase) {
   const f = mission.flavour;
   if (Array.isArray(f)) return f[Math.floor(Math.random() * f.length)];
   const cat = _weatherCategory(weather);
+  // Phase-nested structure (e.g. fleet_action): { 1: { fair, foul, ... }, 2: ... }
+  const phaseBlock = f[phase];
+  if (phaseBlock && typeof phaseBlock === 'object' && !Array.isArray(phaseBlock)) {
+    const pool = phaseBlock[cat] || phaseBlock.default || [];
+    return pool[Math.floor(Math.random() * pool.length)] || '';
+  }
   const pool = f[cat] || f.default || [];
   return pool[Math.floor(Math.random() * pool.length)] || '';
 }
@@ -2388,14 +2414,21 @@ function _weightedPick(arr) {
   return arr[arr.length - 1];
 }
 
-function _pickMissionForZone(forceA, forceB) {
+const PHASE_WEIGHTS = {
+  1: { fleet_action: 8,  commerce_raid: 18, cutting_out: 18, dispatches: 20, blockade_run: 8,  reconnaissance: 14, shore_bombardment: 6,  shore_raid: 12, watering: 12 },
+  2: { fleet_action: 18, commerce_raid: 16, cutting_out: 12, dispatches: 14, blockade_run: 16, reconnaissance: 10, shore_bombardment: 10, shore_raid: 10, watering: 8  },
+  3: { fleet_action: 28, commerce_raid: 10, cutting_out: 6,  dispatches: 8,  blockade_run: 18, reconnaissance: 8,  shore_bombardment: 16, shore_raid: 4,  watering: 4  },
+};
+
+function _pickMissionForZone(forceA, forceB, phase) {
   const countA = forceA.length, countB = forceB.length;
   const hasMerchant = [...forceA, ...forceB].some(s => (appData.players||{})[s.player]?.faction === 'Merchant' || s.faction === 'Merchant');
+  const phaseW = PHASE_WEIGHTS[phase] || PHASE_WEIGHTS[2];
   const pool = MISSION_TYPES.map(m => {
-    let w = m.weight;
-    if (m.id === 'fleet_action' && (countA < 2 || countB < 2)) w = 4;
-    if (m.id === 'commerce_raid' && hasMerchant) w = 25;
-    if (m.id === 'blockade_run' && Math.abs(countA - countB) >= 2) w = m.weight + 6;
+    let w = phaseW[m.id] ?? m.weight;
+    if (m.id === 'fleet_action' && (countA < 2 || countB < 2)) w = Math.min(w, 4);
+    if (m.id === 'commerce_raid' && hasMerchant) w = Math.min(w + 10, 30);
+    if (m.id === 'blockade_run' && Math.abs(countA - countB) >= 2) w += 6;
     return { ...m, weight: w };
   });
   return _weightedPick(pool);
@@ -2509,8 +2542,17 @@ window.generateMission = function(zone) {
   }
   if (!factionA) { showToast('No enemy factions in this zone'); return; }
 
-  const mission     = _pickMissionForZone(shipsA, shipsB);
-  const merchant    = mission.merchants ? _weightedPick(mission.merchants) : null;
+  const phase       = (appData.meta || {}).phase || 1;
+  const mission     = _pickMissionForZone(shipsA, shipsB, phase);
+  const merchantPool = mission.merchants
+    ? mission.merchants.map(m => {
+        let w = m.weight;
+        if (m.name === 'Powder Ship')    w = phase === 1 ? 4 : phase === 2 ? 12 : m.weight;
+        if (m.name === 'Large Merchant') w = phase === 1 ? 0 : m.weight;
+        return { ...m, weight: w };
+      }).filter(m => m.weight > 0)
+    : null;
+  const merchant    = merchantPool ? _weightedPick(merchantPool) : null;
   const vessel      = mission.vessel || null;
   const zoneNum     = parseInt((zone.match(/\d+/) || [])[0]);
   const weatherPool = WEATHER_OPTIONS
@@ -2551,7 +2593,7 @@ window.generateMission = function(zone) {
   const effectiveWeather = isNightAction
     ? WEATHER_OPTIONS.find(w => w.name === 'Night Action')
     : weather;
-  const flavour = _pickFlavour(mission, effectiveWeather);
+  const flavour = _pickFlavour(mission, effectiveWeather, phase);
 
   // Assign attacker/defender based on relative strength
   const stronger = shipsA.length >= shipsB.length ? factionA : factionB;
