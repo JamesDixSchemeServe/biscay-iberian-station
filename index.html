@@ -2216,12 +2216,13 @@ const MISSION_TYPES = [
 ];
 
 const WEATHER_OPTIONS = [
-  { name: 'Fair & Clear',    icon: '☀',  weight: 30, note: 'No special conditions.' },
-  { name: 'Light Haze',      icon: '🌫',  weight: 15, note: 'Visibility reduced to 24″. Ships beyond this range cannot be targeted.' },
-  { name: 'Rain Squall',     icon: '🌧',  weight: 20, note: 'All ranged fire at −1 to hit. Wind may shift D6 points at end of each turn.' },
-  { name: 'Heavy Fog',       icon: '🌁',  weight: 10, note: 'Visibility reduced to 12″. Ships must be within this range to be targeted.' },
-  { name: 'Fresh Gale',      icon: '💨',  weight: 15, note: 'All ships move +1 when running, −1 when beating. Risk of rigging damage on a natural 1.' },
-  { name: 'Dying Breeze',    icon: '🍃',  weight: 10, note: 'All movement rates halved. Oared vessels (if any) unaffected.' },
+  { name: 'Smooth as a Glass Pond', icon: '🪞',  weight: 15, note: 'Glassy, windless conditions. Movement severely reduced; ships reliant on oars have the advantage.' },
+  { name: 'Calm',                   icon: '☀',  weight: 25, note: 'Light winds and gentle swell. Standard movement and gunnery conditions.' },
+  { name: 'Light Haze',             icon: '🌫',  weight: 10, note: 'Visibility reduced to around 18″. Ships at longer ranges are difficult to distinguish.' },
+  { name: 'Rain Squalls',           icon: '🌧',  weight: 20, note: 'Intermittent heavy rain reduces visibility and makes gunnery difficult.' },
+  { name: 'Fog Bank',               icon: '🌁',  weight: 10, note: 'Dense fog severely limits visibility. Ships may lose contact entirely.' },
+  { name: 'Rough Seas',             icon: '🌊',  weight: 12, note: 'Heavy swell. Smaller vessels are affected; gunnery accuracy is reduced for all.' },
+  { name: 'Stormy Seas',            icon: '⛈',  weight: 8,  note: 'Violent conditions. All ships risk damage from the weather itself; small vessels are in grave peril.' },
 ];
 
 // Prevailing winds for the Bay of Biscay / Iberian waters — weighted westerly
