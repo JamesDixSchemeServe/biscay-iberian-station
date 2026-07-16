@@ -2197,8 +2197,8 @@ const MISSION_TYPES = [
       'A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.',
     ],
     deploy: () => 'Squadrons deploy on opposite short table edges.',
-    rules: `<strong>Reconnaissance Markers</strong><br>Place D3+3 markers on shore to represent points of interest.`,
-    goal: { attacker: 'Bring a ship within 12″ of each nominated point of interest, then withdraw.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
+    rules: `<strong>Points of Interest</strong><br>Place D3+3 markers on shore to represent points of interest.<br><br>To investigate a Point of Interest, a friendly ship must move within 12″ of it and remain there until the start of its next activation. Once investigated, remove the Point of Interest.`,
+    goal: { attacker: 'Investigate all Points of Interest and safely withdraw at least one investigating ship from the board.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
   {
     id: 'shore_bombardment',
@@ -2468,21 +2468,33 @@ window.generateMission = function(zone) {
       </div>
 
       ${merchant ? `
-      <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:14px;margin-bottom:14px">
-        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Target Vessel</div>
-        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-          <span style="font-family:'Cinzel',serif;font-size:1rem;color:var(--accent)">⛵ ${merchant.name}</span>
-          <span style="font-size:0.78rem;color:var(--text-muted)">${merchant.type}</span>
-          <span style="font-size:0.78rem;color:var(--accent);margin-left:auto">💰 ${merchant.value} resources</span>
+      <div style="margin-bottom:14px">
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Target Vessel</div>
+        <div class="ship-card" style="cursor:default">
+          <div class="ship-top">
+            <div>
+              <div class="ship-name">${merchant.name}</div>
+              <div class="ship-type">${merchant.type}</div>
+            </div>
+            <div style="font-size:0.8rem;color:var(--accent)">💰 ${merchant.value} res</div>
+          </div>
+          <div class="ship-meta">
+            <span class="tag crew-inex">${merchant.crew} Crew</span>
+            <span class="tag">⬜ Square Rigged</span>
+          </div>
+          <div class="sp-bar-wrap"><div class="sp-bar" style="width:100%;background:var(--green)"></div></div>
+          <div class="game-stat-bar">
+            <div class="gs-item"><div class="gs-label">Size</div><div class="gs-val">M</div></div>
+            <div class="gs-item"><div class="gs-label">Broadsides</div><div class="gs-val" style="color:var(--accent)">${merchant.guns === 'None' ? '—' : merchant.guns.replace(' × ','').replace('6lb','L')}</div></div>
+            <div class="gs-item"><div class="gs-label">Bow</div><div class="gs-val">—</div></div>
+            <div class="gs-item"><div class="gs-label">Stern</div><div class="gs-val">—</div></div>
+            <div class="gs-item"><div class="gs-label">SP</div><div class="gs-val gs-sp"><span>${merchant.sp}/${merchant.sp}</span></div></div>
+            <div class="gs-item"><div class="gs-label">Turn</div><div class="gs-val" style="color:#f4c430">Yellow</div></div>
+            <div class="gs-item"><div class="gs-label">Knots</div><div class="gs-val">${merchant.rok}</div></div>
+            <div class="gs-item"><div class="gs-label">Break</div><div class="gs-val">${Math.ceil(merchant.sp * 0.4)}</div></div>
+          </div>
+          ${merchant.special ? `<div style="margin-top:6px;padding:8px;background:rgba(220,50,50,0.1);border-left:3px solid var(--red);border-radius:3px;font-size:0.78rem;color:var(--red)">${merchant.special}</div>` : ''}
         </div>
-        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.82rem">
-          <span><strong>SP:</strong> ${merchant.sp}</span>
-          <span><strong>Guns:</strong> ${merchant.guns}</span>
-          <span><strong>ROK:</strong> ${merchant.rok}</span>
-          <span><strong>Rig:</strong> ${merchant.rig}</span>
-          <span><strong>Crew:</strong> ${merchant.crew}</span>
-        </div>
-        ${merchant.special ? `<div style="margin-top:8px;padding:8px;background:rgba(220,50,50,0.1);border-left:3px solid var(--red);border-radius:3px;font-size:0.78rem;color:var(--red)">${merchant.special}</div>` : ''}
       </div>` : ''}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
