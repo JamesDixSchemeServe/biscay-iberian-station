@@ -319,12 +319,27 @@
 <div id="no-campaign-screen" style="display:none">
   <header><h1>⚓ Biscay & Iberian Station</h1></header>
   <div id="setup">
-    <h2>No Campaign Specified</h2>
-    <p>You need a campaign link to access this app. Ask your campaign organiser to share the URL with you from Campaign Management.</p>
-    <p style="font-size:0.85rem;color:var(--text-muted);margin-top:12px">If you are the organiser, enter your campaign ID below to get started:</p>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <input id="nc-id" placeholder="e.g. biscay-1805" style="flex:1">
-      <button class="btn" onclick="noCampaignGo()">Go</button>
+    <h2>Welcome</h2>
+    <p style="color:var(--text-muted);margin-bottom:24px">Black Seas Campaign Manager</p>
+
+    <div style="display:grid;grid-template-columns:1fr;gap:16px;max-width:380px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px">
+        <div style="font-family:'Cinzel',serif;font-size:1rem;color:var(--accent);margin-bottom:8px">✦ New Campaign</div>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px">Create a new campaign with a unique ID.</p>
+        <div style="display:flex;gap:8px">
+          <input id="nc-new" placeholder="e.g. atlantic-1803" style="flex:1;font-size:0.85rem">
+          <button class="btn" onclick="noCampaignCreate()">Create</button>
+        </div>
+      </div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px">
+        <div style="font-family:'Cinzel',serif;font-size:1rem;color:var(--accent);margin-bottom:8px">⚓ Join Campaign</div>
+        <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px">Enter your campaign ID to join an existing campaign.</p>
+        <div style="display:flex;gap:8px">
+          <input id="nc-id" placeholder="e.g. biscay-1805" style="flex:1;font-size:0.85rem">
+          <button class="btn" onclick="noCampaignGo()">Go</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2853,6 +2868,12 @@ window.campaignClone = async function() {
 window.noCampaignGo = function() {
   const id = document.getElementById('nc-id').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
   if (!id) { showToast('Enter a campaign ID'); return; }
+  location.hash = id; location.reload();
+};
+
+window.noCampaignCreate = function() {
+  const id = document.getElementById('nc-new').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  if (!id) { showToast('Enter a campaign name'); return; }
   location.hash = id; location.reload();
 };
 
