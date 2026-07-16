@@ -2318,16 +2318,16 @@ const MISSION_TYPES = [
     weight: 8,
     flavour: {
       fair:     ['The hands are ashore filling casks in clear weather. From the masthead, sails have been sighted — they will be on us before the boats return.',
-                 'At anchor in a sheltered cove, the watering parties are ashore. In plain sight under a clear sky, intelligence reports an enemy squadron approaching fast.'],
+                 'At anchor in a sheltered cove, the watering parties are ashore. In plain sight under a clear sky, a lookout in the topmast reports an enemy squadron approaching fast.'],
       foul:     ['At anchor in a sheltered cove, the watering parties are ashore. In the heavy swell, getting the boats back will be hard work — and the enemy is coming.',
                  'The squadron is critically short of water. In this weather, the boats struggle at the oars — and from the masthead, sails have been sighted.'],
-      obscured: ['The squadron lies at anchor in the fog, watering parties ashore. Intelligence reports an enemy squadron groping through the same murk — they may be on us before we know it.',
+      obscured: ['The squadron lies at anchor in the fog, watering parties ashore. A lookout reports gun flashes in the murk — an enemy squadron is close, and closing.',
                  'The hands are ashore filling casks. The fog that hides the approaching enemy also slows the boats. Get them back aboard and be ready to make sail.'],
       default:  ['The squadron is critically short of water. Boats have been sent ashore to the spring — they must be recovered before the enemy closes in.'],
     },
-    deploy: () => 'Watering ship deploys at anchor within 10″ of the coastline with boats on shore. Friendly ships deploy within 10″ of the watering ship. Enemy squadron deploys on the furthest table edge.',
+    deploy: () => 'Watering ship deploys at anchor at least 10″ from the coastline with boats on shore. Friendly ships deploy within 10″ of the watering ship. Enemy squadron deploys on the furthest table edge.',
     rules: BOATS_RULES,
-    goal: { attacker: 'Sink or disable the anchored vessels before their boats can return from shore.', defender: 'Recover all boats aboard and escape off the table edge. Begins at anchor. Boats return from Turn 3.' },
+    goal: { attacker: 'Sink or disable the anchored vessels before their boats can return from shore.', defender: 'Recover all boats aboard and escape off the table edge. Begins at anchor. Boats can return from Turn 2 onwards.' },
   },
 ];
 
@@ -2565,7 +2565,7 @@ window.generateMission = function(zone) {
 
       <div style="background:var(--surface2);border-radius:6px;padding:12px;margin-bottom:14px">
         <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Table Setup</div>
-        <div><strong>${deployment.icon} ${deployment.name}</strong>${deployment.edge ? ` — coastline on the <strong>${deployment.edge}</strong> edge` : ''}</div>
+        <div><strong>${deployment.icon} ${deployment.name}</strong></div>
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${deployment.note}${shoals ? ' Place D3+3 Shoal Markers within 6″ of the coast.' : ''}</div>
         ${(() => { const d = mission.deploy(deployment); return d ? `<div style="font-size:0.82rem;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${d}</div>` : ''; })()}
       </div>
