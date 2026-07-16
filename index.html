@@ -2119,7 +2119,7 @@ const MISSION_TYPES = [
     id: 'fleet_action',
     name: 'Fleet Action',
     icon: '⚔',
-    minPerSide: 2,
+    weight: 20,
     flavour: [
       'Both squadrons have been sighted in the offing. There is no avoiding a general engagement — the honour of the flag demands it.',
       'The enemy has been brought to bay at last. Signals fly from the flagship: "Engage the enemy more closely."',
@@ -2128,90 +2128,100 @@ const MISSION_TYPES = [
     goal: { attacker: 'Sink or capture the majority of the enemy force.', defender: 'Inflict maximum damage and disengage in good order.' },
   },
   {
+    id: 'commerce_raid',
+    name: 'Commerce Raid',
+    icon: '💰',
+    weight: 15,
+    flavour: [
+      'A rich merchantman — perhaps laden with powder and shot for the enemy garrison — has been sighted making for port. She must not arrive.',
+      'The enemy supply lines depend on these waters. One well-placed attack on their powder ships could change the course of the campaign.',
+      'Prize money awaits. A fat merchant wallows ahead, her escorts spread thin. The opportunity will not come again.',
+    ],
+    goal: { attacker: 'Destroy or capture the designated merchant vessel before she reaches safety.', defender: 'Escort the merchant to safety — she must not be taken or sunk.' },
+  },
+  {
     id: 'cutting_out',
-    name: 'Cutting Out',
+    name: 'Cutting Out Expedition',
     icon: '🗡',
-    minPerSide: 1,
-    nearPort: true,
+    weight: 12,
     flavour: [
-      'A prize lies at anchor under the guns of a shore battery. A bold cutting-out expedition under cover of darkness may carry her off.',
-      'The enemy vessel has put into a small cove to make repairs. She is vulnerable — a swift boat action could take her before dawn.',
-      'One of their finest brigs rides at anchor in the roads. The men are eager, the night is dark, and the tide serves.',
+      'A prized enemy brig rides at anchor in the roads. The men are eager, the night is dark, and the tide serves. Boats away.',
+      'Under cover of darkness, the longboats are lowered in silence. The target lies at anchor, her watch half-asleep. Board her and bring her out.',
+      'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.',
     ],
-    goal: { attacker: 'Board and carry off the anchored vessel before defenders can respond.', defender: 'Drive off the raiders and protect the anchorage.' },
+    goal: { attacker: 'Row in by boat, board the nominated target vessel at anchor, and sail her clear of the table.', defender: 'Raise the alarm and drive off the raiders before the ship is taken.' },
   },
   {
-    id: 'convoy_escort',
-    name: 'Convoy Escort',
-    icon: '🚢',
-    minPerSide: 1,
+    id: 'dispatches',
+    name: 'Dispatches',
+    icon: '📜',
+    weight: 14,
     flavour: [
-      'A merchantman loaded with vital military supplies must be shepherded through waters known to harbour enemy cruisers.',
-      'Three valuable prizes are to be conveyed to port. Intelligence suggests the enemy is aware of their route.',
-      'The convoy carries despatches of the highest importance. It must not fall into enemy hands at any cost.',
+      'A fast sloop carries despatches of the utmost importance to the Admiral. The enemy knows she is coming.',
+      'The nominated vessel carries sealed orders that must not fall into enemy hands. She is to be taken or driven off at all costs.',
+      'Intelligence has reached us that the enemy courier is at sea. Intercept her before she delivers her despatches.',
     ],
-    goal: { attacker: 'Intercept and capture the convoy before it reaches safety.', defender: 'Escort the convoy to safety — the merchant ships must not be taken.' },
-  },
-  {
-    id: 'chase',
-    name: 'Running Chase',
-    icon: '💨',
-    minPerSide: 1,
-    flavour: [
-      'The enemy has been sighted making all sail for the horizon. Every stitch of canvas is set in pursuit.',
-      'Outnumbered and outgunned, discretion is the better part of valour. The order is given: make all sail.',
-      'A fast-sailing sloop has been caught in the open — if she can be brought to action before nightfall, she is ours.',
-    ],
-    goal: { attacker: 'Run down the fleeing vessel and bring her to action before she escapes the table edge.', defender: 'Escape off the far table edge with the hull intact.' },
+    goal: { attacker: 'Intercept and capture the nominated target vessel before she escapes.', defender: 'Get the nominated vessel off the far table edge intact.' },
   },
   {
     id: 'blockade_run',
     name: 'Blockade Run',
     icon: '🏃',
-    minPerSide: 1,
+    weight: 13,
     flavour: [
-      'The port has been under close blockade for a fortnight. A fast brig is ordered to run the gauntlet with vital despatches.',
-      'Supplies within the port are running critically low. A runner must slip through under cover of foul weather.',
-      'Orders from the Admiral must reach the squadron inside. One ship must get through — whatever the cost.',
+      'The port has been under close blockade for a fortnight. Vital supplies must get through — whatever the cost.',
+      'The squadron is ordered to push through the enemy line and make for open water. One ship at least must reach the other side.',
+      'Under cover of foul weather, the order is given: full sail, straight through. The blockaders cannot stop them all.',
     ],
-    goal: { attacker: 'Prevent any enemy vessel from crossing to the safe table edge.', defender: 'Get at least one ship off the far edge regardless of losses.' },
+    goal: { attacker: 'Prevent any enemy vessel from crossing to the opposite table edge.', defender: 'Get at least one ship off the opposite table edge regardless of losses.' },
   },
   {
     id: 'reconnaissance',
-    name: 'Reconnaissance in Force',
+    name: 'Reconnaissance',
     icon: '🔭',
-    minPerSide: 1,
+    weight: 10,
     flavour: [
-      'The Admiral requires certain intelligence of the enemy\'s dispositions. A small squadron is detached to look into the anchorage.',
-      'Rumour places an enemy squadron somewhere in these waters. We must establish the truth before committing the fleet.',
-      'The coast ahead is poorly charted and suspected to harbour enemy vessels. Proceed with caution — information is the prize.',
+      'The Admiral requires intelligence of the coastal defences. Three nominated shore positions must be surveyed under fire if necessary.',
+      'The coast ahead is poorly charted and believed to harbour enemy forces. Close it and bring back what you find.',
+      'A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.',
     ],
-    goal: { attacker: 'Penetrate to within gun range of the enemy position and withdraw intact.', defender: 'Drive off the enemy scouts before they can report back.' },
+    goal: { attacker: 'Bring each ship within 12″ of all nominated shore positions, then withdraw.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
   {
-    id: 'duel',
-    name: 'Single Ship Action',
-    icon: '🤺',
-    minPerSide: 1,
-    onePerSide: true,
+    id: 'shore_bombardment',
+    name: 'Shore Bombardment',
+    icon: '💣',
+    weight: 10,
     flavour: [
-      'Two captains of equal pride have manoeuvred for the weather gauge since dawn. Now, at last, they are within range.',
-      'The enemy captain has accepted the implicit challenge. Both ships have cleared for action — let the better man prevail.',
-      'Honour demands satisfaction. The two vessels have separated from their consorts and the matter will be settled between them alone.',
+      'Enemy artillery on the headland has troubled our ships of the line for too long. The shore batteries are to be silenced.',
+      'The garrison stores along the waterfront are to be destroyed. Bring the squadron in close and open fire.',
+      'Orders are clear: reduce the coastal fortification to rubble. The army cannot advance until those guns are silenced.',
     ],
-    goal: { attacker: 'Dismast, board, or force the surrender of the enemy vessel.', defender: 'Same — there is no defender here, only two captains and their honour.' },
+    goal: { attacker: 'Destroy the nominated shore targets using ships\' guns.', defender: 'Drive off the attacking squadron before the shore targets are destroyed.' },
   },
   {
-    id: 'landing_party',
+    id: 'shore_raid',
     name: 'Shore Raid',
     icon: '⚓',
-    minPerSide: 1,
+    weight: 8,
     flavour: [
-      'A signal station on the headland has been a thorn in our side for months. A landing party under cover of the squadron\'s guns will silence it.',
-      'Enemy stores and artillery are reported stockpiled in the village. A swift raid before they can be removed would be a considerable blow.',
-      'The coast road carries regular enemy despatches. A raiding party put ashore at night could do considerable mischief.',
+      'A signal station on the headland has been a thorn in our side for months. Boats and men are to be put ashore to destroy it.',
+      'Enemy stores are stockpiled in the coastal village. A landing party will burn what they can and be back aboard before dawn.',
+      'The raiding party goes ashore under covering fire. Destroy the nominated targets — but if the boats are lost, those men are gone.',
     ],
-    goal: { attacker: 'Land a party and destroy the shore objective. Ships provide covering fire.', defender: 'Drive the raiding party back to their boats before the objective is reached.' },
+    goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
+  },
+  {
+    id: 'watering',
+    name: 'Watering Expedition',
+    icon: '💧',
+    weight: 8,
+    flavour: [
+      'The squadron is critically short of water. Boats have been sent ashore to the spring — they must be recovered before the enemy closes in.',
+      'At anchor in a sheltered cove, the watering parties are ashore. Intelligence now reports an enemy squadron approaching.',
+      'The hands are ashore filling casks. From the masthead, sails have been sighted. Get the boats back aboard and make sail.',
+    ],
+    goal: { attacker: 'Sink or disable the anchored vessels before their boats can return from shore.', defender: 'Recover all boats aboard and escape off the table edge. Begins at anchor. Boats return from Turn 3.' },
   },
 ];
 
@@ -2257,20 +2267,15 @@ function _weightedPick(arr) {
 
 function _pickMissionForZone(forceA, forceB) {
   const countA = forceA.length, countB = forceB.length;
-  const hasMerchant = [...forceA, ...forceB].some(s => s.faction === 'Merchant' || (appData.players||{})[s.player]?.faction === 'Merchant');
-  const pool = [];
-  MISSION_TYPES.forEach(m => {
-    if (m.minPerSide > Math.min(countA, countB)) return;
-    if (m.onePerSide && (countA > 2 || countB > 2)) return;
-    let w = 10;
-    if (m.id === 'fleet_action' && countA >= 2 && countB >= 2) w = 20;
-    if (m.id === 'convoy_escort' && hasMerchant) w = 25;
-    if (m.id === 'chase' && (countA === 1 || countB === 1)) w = 18;
-    if (m.id === 'duel' && countA === 1 && countB === 1) w = 22;
-    if (m.id === 'blockade_run' && Math.abs(countA - countB) >= 2) w = 16;
-    pool.push({ ...m, weight: w });
+  const hasMerchant = [...forceA, ...forceB].some(s => (appData.players||{})[s.player]?.faction === 'Merchant' || s.faction === 'Merchant');
+  const pool = MISSION_TYPES.map(m => {
+    let w = m.weight;
+    if (m.id === 'fleet_action' && (countA < 2 || countB < 2)) w = 4;
+    if (m.id === 'commerce_raid' && hasMerchant) w = 25;
+    if (m.id === 'blockade_run' && Math.abs(countA - countB) >= 2) w = m.weight + 6;
+    return { ...m, weight: w };
   });
-  return _weightedPick(pool.length ? pool : MISSION_TYPES.map(m => ({ ...m, weight: 10 })));
+  return _weightedPick(pool);
 }
 
 function renderOrders() {
@@ -2386,7 +2391,11 @@ window.generateMission = function(zone) {
   const wind        = weather.lockWind
     ? WIND_DIRECTIONS.find(w => w.dir === weather.lockWind) || _weightedPick(WIND_DIRECTIONS)
     : _weightedPick(WIND_DIRECTIONS);
-  const deployment  = _weightedPick(DEPLOYMENT_OPTIONS.map(d => ({ ...d, weight: 10 })));
+  const shoreRequired = ['cutting_out','reconnaissance','shore_bombardment','shore_raid','watering'].includes(mission.id);
+  const deploymentPool = DEPLOYMENT_OPTIONS
+    .filter(d => !shoreRequired || d.edge)
+    .map(d => ({ ...d, weight: 10 }));
+  const deployment = _weightedPick(deploymentPool);
   const flavour     = mission.flavour[Math.floor(Math.random() * mission.flavour.length)];
 
   // Assign attacker/defender based on relative strength
