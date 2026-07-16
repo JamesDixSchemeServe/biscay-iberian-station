@@ -591,6 +591,7 @@ function renderCurrentTab() {
           recalcInterceptionMod(zone.replace(/\s+/g,'_'));
         });
         break;
+      case 'orders':        c.innerHTML = renderOrders(); break;
       case 'rules':         c.innerHTML = renderRules(); break;
       default:         c.innerHTML = renderOverview(); break;
     }
@@ -621,6 +622,7 @@ function rebuildNav() {
       const pending = milPlayers.filter(([pid]) => !moveDone[pid]).map(([,p]) => p.name).join(', ');
       return `<button class="${cls}" onclick="${allConfirmed?`showTab('interception')`:`showToast('Movement not confirmed: '+${JSON.stringify(pending)})`}">⚔ Interception</button>`;
     })()}
+    <button class="${currentTab==='orders'?'active':''}" onclick="showTab('orders')">⚓ Orders</button>
     <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>
   `;
 }
@@ -2109,6 +2111,299 @@ window.saveTurnNote = async function(turn) {
   closeModal();
   showToast(`Turn ${turn} notes saved`);
   renderCurrentTab();
+};
+
+// ─── ORDERS / MISSION GENERATOR ──────────────────────────────────────────────
+const MISSION_TYPES = [
+  {
+    id: 'fleet_action',
+    name: 'Fleet Action',
+    icon: '⚔',
+    minPerSide: 2,
+    flavour: [
+      'Both squadrons have been sighted in the offing. There is no avoiding a general engagement — the honour of the flag demands it.',
+      'The enemy has been brought to bay at last. Signals fly from the flagship: "Engage the enemy more closely."',
+      'Intelligence places the opposing force directly across our intended course. A decisive action cannot be avoided.',
+    ],
+    goal: { attacker: 'Sink or capture the majority of the enemy force.', defender: 'Inflict maximum damage and disengage in good order.' },
+  },
+  {
+    id: 'cutting_out',
+    name: 'Cutting Out',
+    icon: '🗡',
+    minPerSide: 1,
+    nearPort: true,
+    flavour: [
+      'A prize lies at anchor under the guns of a shore battery. A bold cutting-out expedition under cover of darkness may carry her off.',
+      'The enemy vessel has put into a small cove to make repairs. She is vulnerable — a swift boat action could take her before dawn.',
+      'One of their finest brigs rides at anchor in the roads. The men are eager, the night is dark, and the tide serves.',
+    ],
+    goal: { attacker: 'Board and carry off the anchored vessel before defenders can respond.', defender: 'Drive off the raiders and protect the anchorage.' },
+  },
+  {
+    id: 'convoy_escort',
+    name: 'Convoy Escort',
+    icon: '🚢',
+    minPerSide: 1,
+    flavour: [
+      'A merchantman loaded with vital military supplies must be shepherded through waters known to harbour enemy cruisers.',
+      'Three valuable prizes are to be conveyed to port. Intelligence suggests the enemy is aware of their route.',
+      'The convoy carries despatches of the highest importance. It must not fall into enemy hands at any cost.',
+    ],
+    goal: { attacker: 'Intercept and capture the convoy before it reaches safety.', defender: 'Escort the convoy to safety — the merchant ships must not be taken.' },
+  },
+  {
+    id: 'chase',
+    name: 'Running Chase',
+    icon: '💨',
+    minPerSide: 1,
+    flavour: [
+      'The enemy has been sighted making all sail for the horizon. Every stitch of canvas is set in pursuit.',
+      'Outnumbered and outgunned, discretion is the better part of valour. The order is given: make all sail.',
+      'A fast-sailing sloop has been caught in the open — if she can be brought to action before nightfall, she is ours.',
+    ],
+    goal: { attacker: 'Run down the fleeing vessel and bring her to action before she escapes the table edge.', defender: 'Escape off the far table edge with the hull intact.' },
+  },
+  {
+    id: 'blockade_run',
+    name: 'Blockade Run',
+    icon: '🏃',
+    minPerSide: 1,
+    flavour: [
+      'The port has been under close blockade for a fortnight. A fast brig is ordered to run the gauntlet with vital despatches.',
+      'Supplies within the port are running critically low. A runner must slip through under cover of foul weather.',
+      'Orders from the Admiral must reach the squadron inside. One ship must get through — whatever the cost.',
+    ],
+    goal: { attacker: 'Prevent any enemy vessel from crossing to the safe table edge.', defender: 'Get at least one ship off the far edge regardless of losses.' },
+  },
+  {
+    id: 'reconnaissance',
+    name: 'Reconnaissance in Force',
+    icon: '🔭',
+    minPerSide: 1,
+    flavour: [
+      'The Admiral requires certain intelligence of the enemy\'s dispositions. A small squadron is detached to look into the anchorage.',
+      'Rumour places an enemy squadron somewhere in these waters. We must establish the truth before committing the fleet.',
+      'The coast ahead is poorly charted and suspected to harbour enemy vessels. Proceed with caution — information is the prize.',
+    ],
+    goal: { attacker: 'Penetrate to within gun range of the enemy position and withdraw intact.', defender: 'Drive off the enemy scouts before they can report back.' },
+  },
+  {
+    id: 'duel',
+    name: 'Single Ship Action',
+    icon: '🤺',
+    minPerSide: 1,
+    onePerSide: true,
+    flavour: [
+      'Two captains of equal pride have manoeuvred for the weather gauge since dawn. Now, at last, they are within range.',
+      'The enemy captain has accepted the implicit challenge. Both ships have cleared for action — let the better man prevail.',
+      'Honour demands satisfaction. The two vessels have separated from their consorts and the matter will be settled between them alone.',
+    ],
+    goal: { attacker: 'Dismast, board, or force the surrender of the enemy vessel.', defender: 'Same — there is no defender here, only two captains and their honour.' },
+  },
+  {
+    id: 'landing_party',
+    name: 'Shore Raid',
+    icon: '⚓',
+    minPerSide: 1,
+    flavour: [
+      'A signal station on the headland has been a thorn in our side for months. A landing party under cover of the squadron\'s guns will silence it.',
+      'Enemy stores and artillery are reported stockpiled in the village. A swift raid before they can be removed would be a considerable blow.',
+      'The coast road carries regular enemy despatches. A raiding party put ashore at night could do considerable mischief.',
+    ],
+    goal: { attacker: 'Land a party and destroy the shore objective. Ships provide covering fire.', defender: 'Drive the raiding party back to their boats before the objective is reached.' },
+  },
+];
+
+const WEATHER_OPTIONS = [
+  { name: 'Fair & Clear',    icon: '☀',  weight: 30, note: 'No special conditions.' },
+  { name: 'Light Haze',      icon: '🌫',  weight: 15, note: 'Visibility reduced to 24″. Ships beyond this range cannot be targeted.' },
+  { name: 'Rain Squall',     icon: '🌧',  weight: 20, note: 'All ranged fire at −1 to hit. Wind may shift D6 points at end of each turn.' },
+  { name: 'Heavy Fog',       icon: '🌁',  weight: 10, note: 'Visibility reduced to 12″. Ships must be within this range to be targeted.' },
+  { name: 'Fresh Gale',      icon: '💨',  weight: 15, note: 'All ships move +1 when running, −1 when beating. Risk of rigging damage on a natural 1.' },
+  { name: 'Dying Breeze',    icon: '🍃',  weight: 10, note: 'All movement rates halved. Oared vessels (if any) unaffected.' },
+];
+
+// Prevailing winds for the Bay of Biscay / Iberian waters — weighted westerly
+const WIND_DIRECTIONS = [
+  { dir: 'West',       weight: 28 },
+  { dir: 'South-West', weight: 24 },
+  { dir: 'North-West', weight: 18 },
+  { dir: 'North',      weight: 10 },
+  { dir: 'South',      weight: 8  },
+  { dir: 'East',       weight: 6  },
+  { dir: 'North-East', weight: 4  },
+  { dir: 'South-East', weight: 2  },
+];
+
+const DEPLOYMENT_OPTIONS = [
+  { name: 'Open Sea',          icon: '🌊', note: 'No coastline. Both sides deploy from opposite short edges.' },
+  { name: 'Portuguese Coast',  icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge. Shoals within 6″ of the coast.' },
+  { name: 'Spanish North Coast', icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge. Rocky headlands provide cover.' },
+  { name: 'Southern Approaches', icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge. Approaches to the Strait.' },
+  { name: 'Bay Anchorage',     icon: '⚓', edge: 'East',  note: 'Sheltered bay on the east edge. One side begins at anchor.' },
+];
+
+function _weightedPick(arr) {
+  const total = arr.reduce((s, x) => s + x.weight, 0);
+  let r = Math.random() * total;
+  for (const x of arr) { r -= x.weight; if (r <= 0) return x; }
+  return arr[arr.length - 1];
+}
+
+function _pickMissionForZone(forceA, forceB) {
+  const countA = forceA.length, countB = forceB.length;
+  const hasMerchant = [...forceA, ...forceB].some(s => s.faction === 'Merchant' || (appData.players||{})[s.player]?.faction === 'Merchant');
+  const pool = [];
+  MISSION_TYPES.forEach(m => {
+    if (m.minPerSide > Math.min(countA, countB)) return;
+    if (m.onePerSide && (countA > 2 || countB > 2)) return;
+    let w = 10;
+    if (m.id === 'fleet_action' && countA >= 2 && countB >= 2) w = 20;
+    if (m.id === 'convoy_escort' && hasMerchant) w = 25;
+    if (m.id === 'chase' && (countA === 1 || countB === 1)) w = 18;
+    if (m.id === 'duel' && countA === 1 && countB === 1) w = 22;
+    if (m.id === 'blockade_run' && Math.abs(countA - countB) >= 2) w = 16;
+    pool.push({ ...m, weight: w });
+  });
+  return _weightedPick(pool.length ? pool : MISSION_TYPES.map(m => ({ ...m, weight: 10 })));
+}
+
+function renderOrders() {
+  const ships   = appData.ships   || {};
+  const players = appData.players || {};
+
+  // Group active ships by zone
+  const byZone = {};
+  Object.values(ships).forEach(s => {
+    if (s.status === 'sunk' || s.status === 'lost') return;
+    const loc = (s.location || '').trim();
+    if (!byZone[loc]) byZone[loc] = [];
+    byZone[loc].push(s);
+  });
+
+  // Only show zones with ships from at least two different players
+  const contestedZones = Object.entries(byZone).filter(([, arr]) => {
+    const factions = new Set(arr.map(s => (players[s.player] || {}).faction || s.faction));
+    return factions.size >= 2;
+  });
+
+  const allZones = Object.entries(byZone).sort(([a],[b]) => a.localeCompare(b));
+
+  let html = `<div class="section-header"><h2>⚓ Orders of Battle</h2></div>
+  <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Select a zone to generate a mission brief based on the forces present.</p>`;
+
+  // Zone overview
+  html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:28px">`;
+  allZones.forEach(([zone, arr]) => {
+    const factionGroups = {};
+    arr.forEach(s => {
+      const f = (players[s.player] || {}).faction || s.faction || 'Unknown';
+      if (!factionGroups[f]) factionGroups[f] = [];
+      factionGroups[f].push(s);
+    });
+    const contested = Object.keys(factionGroups).length >= 2;
+    html += `<div style="background:var(--surface);border:1px solid ${contested?'var(--accent)':'var(--border)'};border-radius:8px;padding:14px">
+      <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${contested?'var(--accent)':'var(--text)'};margin-bottom:8px">${zone} ${contested?'<span style="font-size:0.7rem;color:var(--accent)">(contested)</span>':''}</div>
+      ${Object.entries(factionGroups).map(([f, ss]) => `<div style="font-size:0.8rem;color:var(--text-muted)">${FACTION_FLAG[f]||''} ${f}: ${ss.length} ship${ss.length!==1?'s':''}</div>`).join('')}
+      ${contested ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" onclick="generateMission(${JSON.stringify(zone)})">Generate Mission</button>` : ''}
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Generated mission display area
+  html += `<div id="mission-output"></div>`;
+
+  return html;
+}
+
+window.generateMission = function(zone) {
+  const ships   = appData.ships   || {};
+  const players = appData.players || {};
+
+  const zoneShips = Object.values(ships).filter(s =>
+    (s.location||'').trim() === zone && s.status !== 'sunk' && s.status !== 'lost'
+  );
+
+  // Group by faction
+  const byFaction = {};
+  zoneShips.forEach(s => {
+    const f = (players[s.player] || {}).faction || s.faction || 'Unknown';
+    if (!byFaction[f]) byFaction[f] = [];
+    byFaction[f].push(s);
+  });
+
+  const factions = Object.entries(byFaction).filter(([f]) => f !== 'Merchant');
+  if (factions.length < 2) { showToast('Need two opposing factions to generate a mission'); return; }
+
+  const [factionA, shipsA] = factions[0];
+  const [factionB, shipsB] = factions[1];
+
+  const mission     = _pickMissionForZone(shipsA, shipsB);
+  const weather     = _weightedPick(WEATHER_OPTIONS);
+  const wind        = _weightedPick(WIND_DIRECTIONS);
+  const deployment  = _weightedPick(DEPLOYMENT_OPTIONS.map(d => ({ ...d, weight: 10 })));
+  const flavour     = mission.flavour[Math.floor(Math.random() * mission.flavour.length)];
+
+  // Assign attacker/defender based on relative strength
+  const stronger = shipsA.length >= shipsB.length ? factionA : factionB;
+  const weaker   = stronger === factionA ? factionB : factionA;
+  const strongerShips = stronger === factionA ? shipsA : shipsB;
+  const weakerShips   = stronger === factionA ? shipsB : shipsA;
+
+  const flagA = FACTION_FLAG[stronger] || '';
+  const flagB = FACTION_FLAG[weaker]   || '';
+
+  const out = document.getElementById('mission-output');
+  if (!out) return;
+
+  out.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:22px;max-width:700px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">
+        <span style="font-size:1.6rem">${mission.icon}</span>
+        <div>
+          <div style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--accent)">${mission.name}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted)">${zone} · Turn ${(appData.meta||{}).turn||1}</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="generateMission(${JSON.stringify(zone)})">🎲 Regenerate</button>
+      </div>
+
+      <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--surface2);border-radius:6px;padding:12px">
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Weather</div>
+          <div style="font-size:1.1rem">${weather.icon} <strong>${weather.name}</strong></div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${weather.note}</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;padding:12px">
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Wind</div>
+          <div style="font-size:1.1rem">🧭 <strong>${wind.dir}</strong></div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">Prevailing for these waters</div>
+        </div>
+      </div>
+
+      <div style="background:var(--surface2);border-radius:6px;padding:12px;margin-bottom:14px">
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Table Setup</div>
+        <div><strong>${deployment.icon} ${deployment.name}</strong>${deployment.edge ? ` — coastline on the <strong>${deployment.edge}</strong> edge` : ''}</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${deployment.note}</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent)">
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${flagA} ${stronger} · Attacker</div>
+          ${strongerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
+          <div style="font-size:0.78rem;color:var(--accent);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.attacker}</div>
+        </div>
+        <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent2)">
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${flagB} ${weaker} · Defender</div>
+          ${weakerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
+          <div style="font-size:0.78rem;color:var(--accent2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.defender}</div>
+        </div>
+      </div>
+    </div>`;
+
+  out.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 // ─── LOG ──────────────────────────────────────────────────────────────────────
