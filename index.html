@@ -2139,6 +2139,11 @@ const MISSION_TYPES = [
       'Prize money awaits. A fat merchant wallows ahead, her escorts spread thin. The opportunity will not come again.',
     ],
     deploy: () => 'Squadrons deploy on opposite short table edges. Merchant vessel deploys within 6″ of the escorting squadron.',
+    merchants: [
+      { name: 'Small Merchant', type: 'Merchantman', sp: 20, guns: '6 × 6lb', rok: 4, value: 50, weight: 40, rig: 'Square', crew: 'Inexperienced', special: null },
+      { name: 'Large Merchant', type: 'Merchantman', sp: 30, guns: '10 × 6lb', rok: 4, value: 100, weight: 35, rig: 'Square', crew: 'Inexperienced', special: null },
+      { name: 'Powder Ship',    type: 'Indiaman',    sp: 30, guns: 'None',    rok: 4, value: 150, weight: 25, rig: 'Square', crew: 'Inexperienced', special: 'POWDER SHIP: Any damage — roll a D6. On a natural 1, the ship explodes causing 2D10 damage to all ships within 10″ and D10 to all ships within 10″–20″.' },
+    ],
     goal: { attacker: 'Destroy or capture the designated merchant vessel before she reaches safety.', defender: 'Escort the merchant to safety — she must not be taken or sunk.' },
   },
   {
@@ -2152,7 +2157,7 @@ const MISSION_TYPES = [
       'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.',
     ],
     deploy: (d) => d.edge ? `Target ship deploys at anchor within 6″ of the ${d.edge} coastline. Defending ships deploy within 10″ of the target ship, not within 10″ of each other. Attacker deploys on their chosen table edge.` : 'Target ship deploys at anchor in the centre of the table. Defending ships deploy within 10″ of the target ship, not within 10″ of each other. Attacker deploys on their chosen table edge.',
-    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.<br><br><strong>Silent Approach</strong><br>At the end of each of the attacker's turns, before the alarm has been raised, both admirals make a Skill Check. The attacking admiral receives +2 to their roll.<br><br>• If the attacker wins or the result is tied, the alarm has not been raised.<br>• If the defender wins, the alarm is immediately raised.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move, or initiate boarding actions, but may fire in self-defence or defend themselves if boarded. Once raised, all defending ships may act normally from their next activation.`,
+    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.<br><br><strong>Silent Approach</strong><br>Once the ship or boats are within 10″ of the target, at the end of each of the attacker's turns, before the alarm has been raised, both admirals make a Skill Check. The attacking admiral receives +2 to their roll.<br><br>• If the attacker wins or the result is tied, the alarm has not been raised.<br>• If the defender wins, the alarm is immediately raised.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move, or initiate boarding actions, but may fire in self-defence or defend themselves if boarded. Once raised, all defending ships may act normally from their next activation.`,
     goal: { attacker: 'Row in by boat, board the nominated target vessel at anchor, and sail her clear of the table.', defender: 'Raise the alarm and drive off the raiders before the ship is taken.' },
   },
   {
@@ -2192,7 +2197,8 @@ const MISSION_TYPES = [
       'A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.',
     ],
     deploy: () => 'Squadrons deploy on opposite short table edges.',
-    goal: { attacker: 'Bring each ship within 12″ of all nominated shore positions, then withdraw.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
+    rules: `<strong>Reconnaissance Markers</strong><br>Place D3+3 markers on shore to represent points of interest.`,
+    goal: { attacker: 'Bring a ship within 12″ of each nominated point of interest, then withdraw.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
   {
     id: 'shore_bombardment',
@@ -2205,6 +2211,7 @@ const MISSION_TYPES = [
       'Orders are clear: reduce the coastal fortification to rubble. The army cannot advance until those guns are silenced.',
     ],
     deploy: () => 'Squadrons deploy on opposite short table edges.',
+    rules: `<strong>Shore Bombardment</strong><br>Place D3+1 Objective Markers on the shoreline to represent the targets of the bombardment. Each Objective Marker has 10 Structure Points.<br><br>Objective Markers may be targeted by Gunnery attacks as though they were stationary ships, but they may not move, evade, or return fire unless represented by a Shore Battery.<br><br>When an Objective Marker is reduced to 0 Structure Points, it is destroyed and removed.`,
     goal: { attacker: 'Destroy the nominated shore targets using ships\' guns.', defender: 'Drive off the attacking squadron before the shore targets are destroyed.' },
   },
   {
@@ -2218,7 +2225,7 @@ const MISSION_TYPES = [
       'The raiding party goes ashore under covering fire. Destroy the nominated targets — but if the boats are lost, those men are gone.',
     ],
     deploy: () => 'Squadrons deploy on opposite short table edges.',
-    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.`,
+    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.<br><br><strong>Shore Raid</strong><br>Place an Objective Marker on the shoreline to represent the target of the raid. A boat carrying a landing party must land within 6″ of the Objective Marker and remain there. At the end of each of the attacker's turns, while a landing party is at the Objective Marker, make a Skill Check for the landing party.<br><br>• Success: The objective is destroyed. Remove the Objective Marker. The landing party may immediately return to its boat.<br>• Failure: The raid continues. Make another Skill Check at the end of the next attacker's turn.<br><br>A landing party forced to leave the Objective Marker before the objective is destroyed must begin the process again if it returns.`,
     goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
   },
   {
@@ -2399,6 +2406,7 @@ window.generateMission = function(zone) {
   if (!factionA) { showToast('No enemy factions in this zone'); return; }
 
   const mission     = _pickMissionForZone(shipsA, shipsB);
+  const merchant    = mission.merchants ? _weightedPick(mission.merchants) : null;
   const weather     = _weightedPick(WEATHER_OPTIONS);
   const wind        = weather.lockWind
     ? WIND_DIRECTIONS.find(w => w.dir === weather.lockWind) || _weightedPick(WIND_DIRECTIONS)
@@ -2458,6 +2466,24 @@ window.generateMission = function(zone) {
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${deployment.note}</div>
         <div style="font-size:0.82rem;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${mission.deploy(deployment)}</div>
       </div>
+
+      ${merchant ? `
+      <div style="background:var(--surface2);border:1px solid var(--accent);border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Target Vessel</div>
+        <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+          <span style="font-family:'Cinzel',serif;font-size:1rem;color:var(--accent)">⛵ ${merchant.name}</span>
+          <span style="font-size:0.78rem;color:var(--text-muted)">${merchant.type}</span>
+          <span style="font-size:0.78rem;color:var(--accent);margin-left:auto">💰 ${merchant.value} resources</span>
+        </div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.82rem">
+          <span><strong>SP:</strong> ${merchant.sp}</span>
+          <span><strong>Guns:</strong> ${merchant.guns}</span>
+          <span><strong>ROK:</strong> ${merchant.rok}</span>
+          <span><strong>Rig:</strong> ${merchant.rig}</span>
+          <span><strong>Crew:</strong> ${merchant.crew}</span>
+        </div>
+        ${merchant.special ? `<div style="margin-top:8px;padding:8px;background:rgba(220,50,50,0.1);border-left:3px solid var(--red);border-radius:3px;font-size:0.78rem;color:var(--red)">${merchant.special}</div>` : ''}
+      </div>` : ''}
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent)">
