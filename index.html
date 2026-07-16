@@ -2125,6 +2125,7 @@ const MISSION_TYPES = [
       'The enemy has been brought to bay at last. Signals fly from the flagship: "Engage the enemy more closely."',
       'Intelligence places the opposing force directly across our intended course. A decisive action cannot be avoided.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges.',
     goal: { attacker: 'Sink or capture the majority of the enemy force.', defender: 'Inflict maximum damage and disengage in good order.' },
   },
   {
@@ -2137,6 +2138,7 @@ const MISSION_TYPES = [
       'The enemy supply lines depend on these waters. One well-placed attack on their powder ships could change the course of the campaign.',
       'Prize money awaits. A fat merchant wallows ahead, her escorts spread thin. The opportunity will not come again.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges. Merchant vessel deploys within 6″ of the escorting squadron.',
     goal: { attacker: 'Destroy or capture the designated merchant vessel before she reaches safety.', defender: 'Escort the merchant to safety — she must not be taken or sunk.' },
   },
   {
@@ -2149,6 +2151,8 @@ const MISSION_TYPES = [
       'Under cover of darkness, the longboats are lowered in silence. The target lies at anchor, her watch half-asleep. Board her and bring her out.',
       'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.',
     ],
+    deploy: (d) => d.edge ? `Target ship deploys at anchor within 6″ of the ${d.edge} coastline. Defending ships deploy within 10″ of the target ship, not within 10″ of each other. Attacker deploys on their chosen table edge.` : 'Target ship deploys at anchor in the centre of the table. Defending ships deploy within 10″ of the target ship, not within 10″ of each other. Attacker deploys on their chosen table edge.',
+    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.<br><br><strong>Silent Approach</strong><br>At the end of each of the attacker's turns, before the alarm has been raised, both admirals make a Skill Check. The attacking admiral receives +2 to their roll.<br><br>• If the attacker wins or the result is tied, the alarm has not been raised.<br>• If the defender wins, the alarm is immediately raised.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move, or initiate boarding actions, but may fire in self-defence or defend themselves if boarded. Once raised, all defending ships may act normally from their next activation.`,
     goal: { attacker: 'Row in by boat, board the nominated target vessel at anchor, and sail her clear of the table.', defender: 'Raise the alarm and drive off the raiders before the ship is taken.' },
   },
   {
@@ -2161,6 +2165,7 @@ const MISSION_TYPES = [
       'The nominated vessel carries sealed orders that must not fall into enemy hands. She is to be taken or driven off at all costs.',
       'Intelligence has reached us that the enemy courier is at sea. Intercept her before she delivers her despatches.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges.',
     goal: { attacker: 'Intercept and capture the nominated target vessel before she escapes.', defender: 'Get the nominated vessel off the far table edge intact.' },
   },
   {
@@ -2173,6 +2178,7 @@ const MISSION_TYPES = [
       'The squadron is ordered to push through the enemy line and make for open water. One ship at least must reach the other side.',
       'Under cover of foul weather, the order is given: full sail, straight through. The blockaders cannot stop them all.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges.',
     goal: { attacker: 'Prevent any enemy vessel from crossing to the opposite table edge.', defender: 'Get at least one ship off the opposite table edge regardless of losses.' },
   },
   {
@@ -2185,6 +2191,7 @@ const MISSION_TYPES = [
       'The coast ahead is poorly charted and believed to harbour enemy forces. Close it and bring back what you find.',
       'A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges.',
     goal: { attacker: 'Bring each ship within 12″ of all nominated shore positions, then withdraw.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
   {
@@ -2197,6 +2204,7 @@ const MISSION_TYPES = [
       'The garrison stores along the waterfront are to be destroyed. Bring the squadron in close and open fire.',
       'Orders are clear: reduce the coastal fortification to rubble. The army cannot advance until those guns are silenced.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges.',
     goal: { attacker: 'Destroy the nominated shore targets using ships\' guns.', defender: 'Drive off the attacking squadron before the shore targets are destroyed.' },
   },
   {
@@ -2209,6 +2217,8 @@ const MISSION_TYPES = [
       'Enemy stores are stockpiled in the coastal village. A landing party will burn what they can and be back aboard before dawn.',
       'The raiding party goes ashore under covering fire. Destroy the nominated targets — but if the boats are lost, those men are gone.',
     ],
+    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.`,
     goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
   },
   {
@@ -2221,6 +2231,8 @@ const MISSION_TYPES = [
       'At anchor in a sheltered cove, the watering parties are ashore. Intelligence now reports an enemy squadron approaching.',
       'The hands are ashore filling casks. From the masthead, sails have been sighted. Get the boats back aboard and make sail.',
     ],
+    deploy: () => 'Watering ship deploys at anchor within 10″ of the coastline with boats on shore. Friendly ships deploy within 10″ of the watering ship. Enemy squadron deploys on the furthest table edge.',
+    rules: `<strong>Boats</strong><br>Ships may deploy one boat per 10 ship points. Boats may initiate boarding actions and generate 1 die each, per boarding action rules.<br><br>Boats may be targeted by Gunnery attacks, but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns are unaffected.`,
     goal: { attacker: 'Sink or disable the anchored vessels before their boats can return from shore.', defender: 'Recover all boats aboard and escape off the table edge. Begins at anchor. Boats return from Turn 3.' },
   },
 ];
@@ -2444,6 +2456,7 @@ window.generateMission = function(zone) {
         <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Table Setup</div>
         <div><strong>${deployment.icon} ${deployment.name}</strong>${deployment.edge ? ` — coastline on the <strong>${deployment.edge}</strong> edge` : ''}</div>
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${deployment.note}</div>
+        <div style="font-size:0.82rem;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${mission.deploy(deployment)}</div>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
@@ -2456,6 +2469,11 @@ window.generateMission = function(zone) {
           <div style="font-size:0.82rem;color:var(--accent2)">${mission.goal.defender}</div>
         </div>
       </div>
+      ${mission.rules ? `
+      <div style="background:var(--surface2);border-radius:6px;padding:14px;margin-bottom:14px;font-size:0.82rem;line-height:1.6;color:var(--text)">
+        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Special Rules</div>
+        ${mission.rules}
+      </div>` : ''}
     </div>`;
 
   out.scrollIntoView({ behavior: 'smooth', block: 'start' });
