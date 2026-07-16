@@ -2886,9 +2886,23 @@ window.campaignClone = async function() {
   setTimeout(() => location.reload(), 1200);
 };
 
-window.noCampaignGo = function() {
+window.noCampaignGo = async function() {
   const id = document.getElementById('nc-id').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
   if (!id) { showToast('Enter a campaign ID'); return; }
+  const btn = document.querySelector('#no-campaign-screen .btn-ghost');
+  if (btn) { btn.textContent = 'Checking…'; btn.disabled = true; }
+  try {
+    const snap = await get(ref(db, `/campaigns/${id}/meta`));
+    if (!snap.exists()) {
+      showToast(`No campaign found with ID "${id}" — check the ID and try again`);
+      if (btn) { btn.textContent = 'Go'; btn.disabled = false; }
+      return;
+    }
+  } catch(e) {
+    showToast('Could not reach the database — check your connection');
+    if (btn) { btn.textContent = 'Go'; btn.disabled = false; }
+    return;
+  }
   location.hash = id; location.reload();
 };
 
