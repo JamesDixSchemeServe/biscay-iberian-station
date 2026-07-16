@@ -2280,7 +2280,7 @@ function renderOrders() {
   // Group active ships by zone — port ships go into their zone
   const byZone = {};
   Object.values(ships).forEach(s => {
-    if (s.status === 'sunk' || s.status === 'lost') return;
+    if (s.status === 'sunk' || s.status === 'lost' || s.status === 'repairing') return;
     const loc = (s.location || '').trim();
     const zoneMatch = loc.match(/Zone\s*(\d+)/i);
     let zone;
@@ -2352,7 +2352,7 @@ window.generateMission = function(zone) {
   const players = appData.players || {};
 
   const zoneShips = Object.values(ships).filter(s => {
-    if (s.status === 'sunk' || s.status === 'lost') return false;
+    if (s.status === 'sunk' || s.status === 'lost' || s.status === 'repairing') return false;
     const loc = (s.location||'').trim();
     const zoneMatch = loc.match(/Zone\s*(\d+)/i);
     const shipZone = zoneMatch ? `Zone ${zoneMatch[1]}` : (PORT_ZONE[loc] ? `Zone ${PORT_ZONE[loc]}` : loc);
@@ -2436,12 +2436,12 @@ window.generateMission = function(zone) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent)">
           <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${flagA} ${stronger} · Attacker</div>
-          ${_shipsBySquadron(strongerShips)}
+          ${strongerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
           <div style="font-size:0.78rem;color:var(--accent);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.attacker}</div>
         </div>
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent2)">
           <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${flagB} ${weaker} · Defender</div>
-          ${_shipsBySquadron(weakerShips)}
+          ${weakerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
           <div style="font-size:0.78rem;color:var(--accent2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.defender}</div>
         </div>
       </div>
