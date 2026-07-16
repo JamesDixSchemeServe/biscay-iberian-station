@@ -506,6 +506,9 @@ async function boot() {
 
 async function connect(cfg) {
   if (!campaignId) {
+    const app = initializeApp(cfg);
+    await signInAnonymously(getAuth(app));
+    db = getDatabase(app);
     document.getElementById('loading').style.display = 'none';
     document.getElementById('no-campaign-screen').style.display = 'block';
     return;
