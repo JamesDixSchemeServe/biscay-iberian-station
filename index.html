@@ -2273,20 +2273,28 @@ function renderOrders() {
   const ships   = appData.ships   || {};
   const players = appData.players || {};
 
-  // Group active ships by zone
+  // Group active ships by zone — port ships go into their zone
   const byZone = {};
   Object.values(ships).forEach(s => {
     if (s.status === 'sunk' || s.status === 'lost') return;
     const loc = (s.location || '').trim();
-    if (!byZone[loc]) byZone[loc] = [];
-    byZone[loc].push(s);
+    const zoneMatch = loc.match(/Zone\s*(\d+)/i);
+    let zone;
+    if (zoneMatch) {
+      zone = `Zone ${zoneMatch[1]}`;
+    } else if (PORT_ZONE[loc]) {
+      zone = `Zone ${PORT_ZONE[loc]}`;
+    } else {
+      zone = loc || 'Unknown';
+    }
+    if (!byZone[zone]) byZone[zone] = [];
+    byZone[zone].push({ ...s, _displayLoc: loc });
   });
 
-  // Only show zones with ships from at least two enemy (non-allied) factions
-  const contestedZones = Object.entries(byZone).filter(([, arr]) => {
+  function _hasEnemies(arr) {
     const factions = [...new Set(arr.map(s => (players[s.player] || {}).faction || s.faction))].filter(f => f !== 'Merchant');
     return factions.some((f1, i) => factions.slice(i+1).some(f2 => !areAllied(f1, f2) && f1 !== f2));
-  });
+  }
 
   const allZones = Object.entries(byZone).sort(([a],[b]) => a.localeCompare(b));
 
@@ -2302,7 +2310,7 @@ function renderOrders() {
       if (!factionGroups[f]) factionGroups[f] = [];
       factionGroups[f].push(s);
     });
-    const contested = Object.keys(factionGroups).length >= 2;
+    const contested = _hasEnemies(arr);
     html += `<div style="background:var(--surface);border:1px solid ${contested?'var(--accent)':'var(--border)'};border-radius:8px;padding:14px">
       <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${contested?'var(--accent)':'var(--text)'};margin-bottom:8px">${zone} ${contested?'<span style="font-size:0.7rem;color:var(--accent)">(contested)</span>':''}</div>
       ${Object.entries(factionGroups).map(([f, ss]) => `<div style="font-size:0.8rem;color:var(--text-muted)">${FACTION_FLAG[f]||''} ${f}: ${ss.length} ship${ss.length!==1?'s':''}</div>`).join('')}
@@ -2321,9 +2329,13 @@ window.generateMission = function(zone) {
   const ships   = appData.ships   || {};
   const players = appData.players || {};
 
-  const zoneShips = Object.values(ships).filter(s =>
-    (s.location||'').trim() === zone && s.status !== 'sunk' && s.status !== 'lost'
-  );
+  const zoneShips = Object.values(ships).filter(s => {
+    if (s.status === 'sunk' || s.status === 'lost') return false;
+    const loc = (s.location||'').trim();
+    const zoneMatch = loc.match(/Zone\s*(\d+)/i);
+    const shipZone = zoneMatch ? `Zone ${zoneMatch[1]}` : (PORT_ZONE[loc] ? `Zone ${PORT_ZONE[loc]}` : loc);
+    return shipZone === zone;
+  });
 
   // Group by faction
   const byFaction = {};
