@@ -2396,7 +2396,11 @@ window.generateMission = function(zone) {
     .filter(d => !shoreRequired || d.edge)
     .map(d => ({ ...d, weight: 10 }));
   const deployment = _weightedPick(deploymentPool);
-  const flavour     = mission.flavour[Math.floor(Math.random() * mission.flavour.length)];
+  const isNightAction = mission.id === 'cutting_out';
+  const effectiveWeather = isNightAction
+    ? WEATHER_OPTIONS.find(w => w.name === 'Night Action')
+    : weather;
+  const flavour = mission.flavour[Math.floor(Math.random() * mission.flavour.length)];
 
   // Assign attacker/defender based on relative strength
   const stronger = shipsA.length >= shipsB.length ? factionA : factionB;
@@ -2426,8 +2430,8 @@ window.generateMission = function(zone) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px">
           <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Weather</div>
-          <div style="font-size:1.1rem">${weather.icon} <strong>${weather.name}</strong></div>
-          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${weather.note}</div>
+          <div style="font-size:1.1rem">${effectiveWeather.icon} <strong>${effectiveWeather.name}</strong></div>
+          <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${effectiveWeather.note}</div>
         </div>
         <div style="background:var(--surface2);border-radius:6px;padding:12px">
           <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Wind</div>
@@ -2444,14 +2448,12 @@ window.generateMission = function(zone) {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent)">
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${flagA} ${stronger} · Attacker</div>
-          ${strongerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
-          <div style="font-size:0.78rem;color:var(--accent);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.attacker}</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Attacker</div>
+          <div style="font-size:0.82rem;color:var(--accent)">${mission.goal.attacker}</div>
         </div>
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent2)">
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${flagB} ${weaker} · Defender</div>
-          ${weakerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
-          <div style="font-size:0.78rem;color:var(--accent2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.defender}</div>
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Defender</div>
+          <div style="font-size:0.82rem;color:var(--accent2)">${mission.goal.defender}</div>
         </div>
       </div>
     </div>`;
