@@ -2282,10 +2282,10 @@ function renderOrders() {
     byZone[loc].push(s);
   });
 
-  // Only show zones with ships from at least two different players
+  // Only show zones with ships from at least two enemy (non-allied) factions
   const contestedZones = Object.entries(byZone).filter(([, arr]) => {
-    const factions = new Set(arr.map(s => (players[s.player] || {}).faction || s.faction));
-    return factions.size >= 2;
+    const factions = [...new Set(arr.map(s => (players[s.player] || {}).faction || s.faction))].filter(f => f !== 'Merchant');
+    return factions.some((f1, i) => factions.slice(i+1).some(f2 => !areAllied(f1, f2) && f1 !== f2));
   });
 
   const allZones = Object.entries(byZone).sort(([a],[b]) => a.localeCompare(b));
@@ -2334,10 +2334,18 @@ window.generateMission = function(zone) {
   });
 
   const factions = Object.entries(byFaction).filter(([f]) => f !== 'Merchant');
-  if (factions.length < 2) { showToast('Need two opposing factions to generate a mission'); return; }
-
-  const [factionA, shipsA] = factions[0];
-  const [factionB, shipsB] = factions[1];
+  // Find two factions that are actually enemies
+  let factionA, shipsA, factionB, shipsB;
+  outer: for (let i = 0; i < factions.length; i++) {
+    for (let j = i+1; j < factions.length; j++) {
+      if (!areAllied(factions[i][0], factions[j][0]) && factions[i][0] !== factions[j][0]) {
+        [factionA, shipsA] = factions[i];
+        [factionB, shipsB] = factions[j];
+        break outer;
+      }
+    }
+  }
+  if (!factionA) { showToast('No enemy factions in this zone'); return; }
 
   const mission     = _pickMissionForZone(shipsA, shipsB);
   const weather     = _weightedPick(WEATHER_OPTIONS);
