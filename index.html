@@ -2216,13 +2216,16 @@ const MISSION_TYPES = [
 ];
 
 const WEATHER_OPTIONS = [
-  { name: 'Smooth as a Glass Pond', icon: '🪞',  weight: 15, note: 'Glassy, windless conditions. Movement severely reduced; ships reliant on oars have the advantage.' },
-  { name: 'Calm',                   icon: '☀',  weight: 25, note: 'Light winds and gentle swell. Standard movement and gunnery conditions.' },
-  { name: 'Light Haze',             icon: '🌫',  weight: 10, note: 'Visibility reduced to around 18″. Ships at longer ranges are difficult to distinguish.' },
-  { name: 'Rain Squalls',           icon: '🌧',  weight: 20, note: 'Intermittent heavy rain reduces visibility and makes gunnery difficult.' },
-  { name: 'Fog Bank',               icon: '🌁',  weight: 10, note: 'Dense fog severely limits visibility. Ships may lose contact entirely.' },
-  { name: 'Rough Seas',             icon: '🌊',  weight: 12, note: 'Heavy swell. Smaller vessels are affected; gunnery accuracy is reduced for all.' },
-  { name: 'Stormy Seas',            icon: '⛈',  weight: 8,  note: 'Violent conditions. All ships risk damage from the weather itself; small vessels are in grave peril.' },
+  { name: 'Smooth as a Glass Pond', icon: '🪞', weight: 13, note: '+1 to all shooting.' },
+  { name: 'Calm',                   icon: '☀',  weight: 30, note: 'No modifiers apply.' },
+  { name: 'Rough Seas',             icon: '🌊', weight: 13, note: '−1 to all shooting. Maximum sail level: Battle Sails. Adrift rate of knots +1.' },
+  { name: 'Stormy Seas',            icon: '⛈',  weight: 10, note: '−2 to all shooting. Maximum sail level: Light Sails. Adrift rate of knots +2.' },
+  { name: 'Fog Bank',               icon: '🌁', weight: 8,  note: 'Templates move 3 ROK with the wind. −2 to hit.' },
+  { name: 'Rain Squalls',           icon: '🌧', weight: 8,  note: 'Templates move 3 ROK with the wind. −1 to hit.' },
+  { name: 'Hazy',                   icon: '🌫', weight: 5,  note: 'Maximum visibility 12″. −1 to all shooting.' },
+  { name: 'Heavy Fog',              icon: '🌫', weight: 4,  note: 'Maximum visibility 12″. −2 to all shooting.' },
+  { name: 'Night Action',           icon: '🌙', weight: 5,  note: 'Maximum visibility 6″. −2 to all shooting. Maximum sail level: Light Sails.' },
+  { name: 'Northerly Swell',        icon: '🧭', weight: 4,  lockWind: 'North', note: 'ROKs +1. Do not roll for wind change this game. −1 to all shooting. Wind direction locked to North.' },
 ];
 
 // Prevailing winds for the Bay of Biscay / Iberian waters — weighted westerly
@@ -2326,6 +2329,24 @@ function renderOrders() {
   return html;
 }
 
+function _shipsBySquadron(ships) {
+  const bySqn = {};
+  ships.forEach(s => {
+    const key = s.squadron ? `Squadron ${s.squadron}` : 'Individual / Detached';
+    if (!bySqn[key]) bySqn[key] = [];
+    bySqn[key].push(s);
+  });
+  const entries = Object.entries(bySqn).sort(([a],[b]) => {
+    if (a === 'Individual / Detached') return 1;
+    if (b === 'Individual / Detached') return -1;
+    return a.localeCompare(b);
+  });
+  return entries.map(([sqn, ss]) => `
+    <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-top:6px;margin-bottom:2px">${sqn}</div>
+    ${ss.map(s => `<div style="font-size:0.8rem;padding-left:6px">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
+  `).join('');
+}
+
 window.generateMission = function(zone) {
   const ships   = appData.ships   || {};
   const players = appData.players || {};
@@ -2362,7 +2383,9 @@ window.generateMission = function(zone) {
 
   const mission     = _pickMissionForZone(shipsA, shipsB);
   const weather     = _weightedPick(WEATHER_OPTIONS);
-  const wind        = _weightedPick(WIND_DIRECTIONS);
+  const wind        = weather.lockWind
+    ? WIND_DIRECTIONS.find(w => w.dir === weather.lockWind) || _weightedPick(WIND_DIRECTIONS)
+    : _weightedPick(WIND_DIRECTIONS);
   const deployment  = _weightedPick(DEPLOYMENT_OPTIONS.map(d => ({ ...d, weight: 10 })));
   const flavour     = mission.flavour[Math.floor(Math.random() * mission.flavour.length)];
 
@@ -2412,13 +2435,13 @@ window.generateMission = function(zone) {
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent)">
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${flagA} ${stronger} · Attacker</div>
-          ${strongerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${flagA} ${stronger} · Attacker</div>
+          ${_shipsBySquadron(strongerShips)}
           <div style="font-size:0.78rem;color:var(--accent);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.attacker}</div>
         </div>
         <div style="background:var(--surface2);border-radius:6px;padding:12px;border-top:3px solid var(--accent2)">
-          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">${flagB} ${weaker} · Defender</div>
-          ${weakerShips.map(s => `<div style="font-size:0.8rem">⛵ ${s.name} <span style="color:var(--text-muted)">${s.type}</span></div>`).join('')}
+          <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">${flagB} ${weaker} · Defender</div>
+          ${_shipsBySquadron(weakerShips)}
           <div style="font-size:0.78rem;color:var(--accent2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px">${mission.goal.defender}</div>
         </div>
       </div>
