@@ -2334,14 +2334,15 @@ const MISSION_TYPES = [
 const WEATHER_OPTIONS = [
   { name: 'Smooth as a Glass Pond', icon: '🪞', weight: 13, note: '+1 to all shooting.' },
   { name: 'Calm',                   icon: '☀',  weight: 30, note: 'No modifiers apply.' },
-  { name: 'Rough Seas',             icon: '🌊', weight: 13, note: '−1 to all shooting.<br>Maximum sail level: Battle Sails.<br>Adrift rate of knots +1.' },
-  { name: 'Stormy Seas',            icon: '⛈',  weight: 10, note: '−2 to all shooting.<br>Maximum sail level: Light Sails.<br>Adrift rate of knots +2.' },
-  { name: 'Fog Bank',               icon: '🌁', weight: 8,  note: 'Templates move 3 ROK with the wind.<br>−2 to hit.' },
+  { name: 'Rough Seas & Rain',      icon: '🌊', weight: 13, note: '−1 to all shooting.<br>Maximum sail level: Battle Sails.<br>Adrift rate of knots +1.' },
+  { name: 'Heavy Storm',            icon: '⛈',  weight: 10, note: '−2 to all shooting.<br>Maximum sail level: Light Sails.<br>Adrift rate of knots +2.' },
+  { name: 'Drifting Fog',           icon: '🌁', weight: 8,  note: 'Templates move 3 ROK with the wind.<br>−2 to hit.' },
   { name: 'Rain Squalls',           icon: '🌧', weight: 8,  note: 'Templates move 3 ROK with the wind.<br>−1 to hit.' },
   { name: 'Hazy',                   icon: '🌫', weight: 5,  note: 'Maximum visibility 12″.<br>−1 to all shooting.' },
   { name: 'Heavy Fog',              icon: '🌫', weight: 4,  note: 'Maximum visibility 12″.<br>−2 to all shooting.' },
   { name: 'Night Action',           icon: '🌙', weight: 5,  note: 'Maximum visibility 6″.<br>−2 to all shooting.<br>Maximum sail level: Light Sails.' },
   { name: 'Northerly Swell',        icon: '🧭', weight: 4,  lockWind: 'North', note: 'ROKs +1.<br>Do not roll for wind change this game.<br>−1 to all shooting.<br>Wind direction locked to North.' },
+  { name: 'Levanter',               icon: '🌬', weight: 0,  lockWind: 'East',  note: 'ROKs +1.<br>Do not roll for wind change this game.<br>−1 to all shooting.<br>Wind direction locked to East.' },
 ];
 
 // Prevailing winds for the Bay of Biscay / Iberian waters — weighted westerly
@@ -2366,7 +2367,7 @@ const DEPLOYMENT_OPTIONS = [
 
 function _weatherCategory(w) {
   if (['Smooth as a Glass Pond', 'Calm'].includes(w.name)) return 'fair';
-  if (['Fog Bank', 'Hazy', 'Heavy Fog'].includes(w.name)) return 'obscured';
+  if (['Drifting Fog', 'Hazy', 'Heavy Fog'].includes(w.name)) return 'obscured';
   if (w.name === 'Night Action') return 'night';
   return 'foul';
 }
@@ -2509,7 +2510,32 @@ window.generateMission = function(zone) {
 
   const mission     = _pickMissionForZone(shipsA, shipsB);
   const merchant    = mission.merchants ? _weightedPick(mission.merchants) : null;
-  const weather     = _weightedPick(WEATHER_OPTIONS);
+  const zoneNum     = parseInt((zone.match(/\d+/) || [])[0]);
+  const weatherPool = WEATHER_OPTIONS
+    .filter(w => w.name !== 'Northerly Swell' || (zoneNum >= 2 && zoneNum <= 6))
+    .filter(w => w.name !== 'Levanter'        || zoneNum === 7)
+    .map(w => {
+      let wt = w.weight || 0;
+      if (zoneNum === 1) {
+        if (w.name === 'Rough Seas & Rain') wt = 22;
+        if (w.name === 'Heavy Storm')       wt = 18;
+        if (w.name === 'Drifting Fog')      wt = 16;
+        if (w.name === 'Heavy Fog')         wt = 10;
+        if (w.name === 'Rain Squalls')      wt = 14;
+        if (w.name === 'Calm')              wt = 10;
+        if (w.name === 'Smooth as a Glass Pond') wt = 4;
+      }
+      if (zoneNum === 7) {
+        if (w.name === 'Calm')              wt = 40;
+        if (w.name === 'Smooth as a Glass Pond') wt = 20;
+        if (w.name === 'Rough Seas & Rain') wt = 6;
+        if (w.name === 'Heavy Storm')       wt = 3;
+        if (w.name === 'Drifting Fog')      wt = 4;
+        if (w.name === 'Levanter')          wt = 8;
+      }
+      return { ...w, weight: wt };
+    });
+  const weather     = _weightedPick(weatherPool);
   const wind        = weather.lockWind
     ? WIND_DIRECTIONS.find(w => w.dir === weather.lockWind) || _weightedPick(WIND_DIRECTIONS)
     : _weightedPick(WIND_DIRECTIONS);
