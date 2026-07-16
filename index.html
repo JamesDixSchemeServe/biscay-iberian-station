@@ -2175,12 +2175,16 @@ const MISSION_TYPES = [
     name: 'Fleet Action',
     icon: '⚔',
     weight: 20,
-    flavour: [
-      'Both squadrons have been sighted in the offing. There is no avoiding a general engagement — the honour of the flag demands it.',
-      'The enemy has been brought to bay at last. Signals fly from the flagship: "Engage the enemy more closely."',
-      'Intelligence places the opposing force directly across our intended course. A decisive action cannot be avoided.',
-    ],
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    flavour: {
+      fair:     ['Both squadrons have been sighted in the offing under a clear sky. There is no avoiding a general engagement — the honour of the flag demands it.',
+                 'The enemy rides clearly on the horizon in the morning light. Signals fly from the flagship: "Engage the enemy more closely."'],
+      foul:     ['In the teeth of the gale, both squadrons close on each other. Spray lashes the gun crews as the range falls. There is no turning back now.',
+                 'The storm has thrown the squadrons together. Fighting in these seas will be bloody work — but the order is given.'],
+      obscured: ['The fog has brought the squadrons to within pistol shot before either raised the alarm. In this murk, it will be savage, close-range work.',
+                 'Muffled gunfire through the fog. The enemy is somewhere close — the order goes out to beat to quarters.'],
+      default:  ['Intelligence places the opposing force directly across our intended course. A decisive action cannot be avoided.'],
+    },
+    deploy: () => '',
     goal: { attacker: 'Sink or capture the majority of the enemy force.', defender: 'Inflict maximum damage and disengage in good order.' },
   },
   {
@@ -2188,11 +2192,15 @@ const MISSION_TYPES = [
     name: 'Commerce Raid',
     icon: '💰',
     weight: 15,
-    flavour: [
-      'A rich merchantman — perhaps laden with powder and shot for the enemy garrison — has been sighted making for port. She must not arrive.',
-      'The enemy supply lines depend on these waters. One well-placed attack on their powder ships could change the course of the campaign.',
-      'Prize money awaits. A fat merchant wallows ahead, her escorts spread thin. The opportunity will not come again.',
-    ],
+    flavour: {
+      fair:     ['A rich merchantman is clearly visible in the offing, making for port under a fair sky. She must not arrive.',
+                 'Prize money awaits. A fat merchant wallows ahead in good sailing weather, her escorts spread thin. The opportunity will not come again.'],
+      foul:     ['A fat merchant labours in the heavy seas ahead, her crew fighting the weather. She is slower than she should be — and we are gaining.',
+                 'The enemy supply lines depend on these waters. In this weather, her escorts will struggle to keep station.'],
+      obscured: ['A dark shape looms in the fog — a merchantman, heavy-laden, her escorts spread thin. She does not see us yet.',
+                 'One well-placed attack on their powder ships could change the course of the campaign. In this murk, we may yet get close enough.'],
+      default:  ['The enemy supply lines depend on these waters. One well-placed attack on their powder ships could change the course of the campaign.'],
+    },
     deploy: () => 'Squadrons deploy on opposite short table edges. Merchant vessel deploys within 6″ of the escorting squadron.',
     merchants: [
       { name: 'Small Merchant', type: 'Merchantman', sp: 20, broadside: '1L', rok: 4, value: 50, weight: 40, rig: 'Square', crew: 'Inexperienced', special: null },
@@ -2206,11 +2214,11 @@ const MISSION_TYPES = [
     name: 'Cutting Out Expedition',
     icon: '🗡',
     weight: 12,
-    flavour: [
-      'A prized enemy brig rides at anchor in the roads. The men are eager, the night is dark, and the tide serves. Boats away.',
-      'Under cover of darkness, the longboats are lowered in silence. The target lies at anchor, her watch half-asleep. Board her and bring her out.',
-      'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.',
-    ],
+    flavour: {
+      default: ['A prized enemy vessel rides at anchor in the roads. The men are eager, the night is dark, and the tide serves. Boats away.',
+                'Under cover of darkness, the longboats are lowered in silence. The target lies at anchor, her watch half-asleep. Board her and bring her out.',
+                'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.'],
+    },
     deploy: (d) => d.edge ? `Target ship deploys at anchor within 6″ of the ${d.edge} coastline. Defending ships deploy within 10″ of the target ship, not within 10″ of each other. Attacker deploys on their chosen table edge.` : 'Target ship deploys at anchor in the centre of the table. Defending ships deploy within 10″ of the target ship, not within 10″ of each other. Attacker deploys on their chosen table edge.',
     rules: BOATS_RULES + `<br><br><strong>Silent Approach</strong><br>Once the ship or boats are within 10″ of the target, at the end of each of the attacker's turns, before the alarm has been raised, both admirals make a Skill Check. The attacking admiral receives +2 to their roll.<br><br>• If the attacker wins or the result is tied, the alarm has not been raised.<br>• If the defender wins, the alarm is immediately raised.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move, or initiate boarding actions, but may fire in self-defence or defend themselves if boarded. Once raised, all defending ships may act normally from their next activation.`,
     goal: { attacker: 'Row in by boat, board the nominated target vessel at anchor, and sail her clear of the table.', defender: 'Raise the alarm and drive off the raiders before the ship is taken.' },
@@ -2220,12 +2228,16 @@ const MISSION_TYPES = [
     name: 'Dispatches',
     icon: '📜',
     weight: 14,
-    flavour: [
-      'A fast sloop carries despatches of the utmost importance to the Admiral. The enemy knows she is coming.',
-      'The nominated vessel carries sealed orders that must not fall into enemy hands. She is to be taken or driven off at all costs.',
-      'Intelligence has reached us that the enemy courier is at sea. Intercept her before she delivers her despatches.',
-    ],
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    flavour: {
+      fair:     ['A fast sloop is clearly visible, making all sail for the harbour. The despatches she carries must not arrive.',
+                 'In clear weather there is nowhere to hide — the courier sloop has been sighted and the chase is on.'],
+      foul:     ['In these heavy seas the courier sloop labours, slower than she should be. Intelligence confirms she carries the Admiral\'s despatches — and we are gaining.',
+                 'The nominated vessel carries sealed orders that must not fall into enemy hands. In this weather, her escorts will struggle to keep station.'],
+      obscured: ['A vessel is sighted through the haze, making for port under press of sail. Intelligence confirms she carries despatches of the utmost importance.',
+                 'The fog is no protection — we know she is out here. Find her before she reaches the harbour.'],
+      default:  ['Intelligence has reached us that the enemy courier is at sea. Intercept her before she delivers her despatches.'],
+    },
+    deploy: () => '',
     goal: { attacker: 'Intercept and capture the nominated target vessel before she escapes.', defender: 'Get the nominated vessel off the far table edge intact.' },
   },
   {
@@ -2233,12 +2245,16 @@ const MISSION_TYPES = [
     name: 'Blockade Run',
     icon: '🏃',
     weight: 13,
-    flavour: [
-      'The port has been under close blockade for a fortnight. Vital supplies must get through — whatever the cost.',
-      'The squadron is ordered to push through the enemy line and make for open water. One ship at least must reach the other side.',
-      'Under cover of foul weather, the order is given: full sail, straight through. The blockaders cannot stop them all.',
-    ],
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    flavour: {
+      fair:     ['The port has been under close blockade for a fortnight. In broad daylight, the odds are against them — but the orders are plain: push through.',
+                 'The squadron is ordered to break through the enemy line and make for open water. In clear weather, it will be costly work.'],
+      foul:     ['Under cover of foul weather, the order is given: full sail, straight through. The blockaders cannot stop them all.',
+                 'In the teeth of the storm, the order is given: break out. The blockaders will struggle to keep their station in these seas.'],
+      obscured: ['The fog is a gift. Boats are laid ahead to guide the ships through the blockading line in silence. Speed and nerve are everything.',
+                 'In this murk the blockade cannot be maintained with certainty. One bold run and they may be clear before the enemy knows they are gone.'],
+      default:  ['Vital supplies must get through — whatever the cost. One ship at least must reach the other side.'],
+    },
+    deploy: () => '',
     goal: { attacker: 'Prevent any enemy vessel from crossing to the opposite table edge.', defender: 'Get at least one ship off the opposite table edge regardless of losses.' },
   },
   {
@@ -2246,12 +2262,16 @@ const MISSION_TYPES = [
     name: 'Reconnaissance',
     icon: '🔭',
     weight: 10,
-    flavour: [
-      'The Admiral requires intelligence of the coastal defences. Three nominated shore positions must be surveyed under fire if necessary.',
-      'The coast ahead is poorly charted and believed to harbour enemy forces. Close it and bring back what you find.',
-      'A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.',
-    ],
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    flavour: {
+      fair:     ['The Admiral requires intelligence of the coastal defences. In clear weather every movement will be seen — and contested.',
+                 'A small squadron is detached to reconnoitre the anchorage. In broad daylight, speed and boldness are the only cover.'],
+      foul:     ['The coast ahead is poorly charted and believed to harbour enemy forces. In heavy weather, close it and bring back what you find.',
+                 'A small squadron is ordered in to survey the anchorage. The weather is against them, but so is delay — the fleet needs this intelligence.'],
+      obscured: ['The fog provides cover as the squadron closes with the shore. Survey the nominated positions and withdraw before the mist lifts.',
+                 'The coast is obscured, the charts are wrong, and the enemy is somewhere close. Get in, observe, and get out.'],
+      default:  ['A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.'],
+    },
+    deploy: () => '',
     rules: `<strong>Points of Interest</strong><br>Place D3+3 markers on shore to represent points of interest.<br><br>To investigate a Point of Interest, a friendly ship must move within 12″ of it and remain there until the start of its next activation. Once investigated, remove the Point of Interest.`,
     goal: { attacker: 'Investigate all Points of Interest and safely withdraw at least one investigating ship from the board.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
@@ -2260,12 +2280,16 @@ const MISSION_TYPES = [
     name: 'Shore Bombardment',
     icon: '💣',
     weight: 10,
-    flavour: [
-      'Enemy artillery on the headland has troubled our ships of the line for too long. The shore batteries are to be silenced.',
-      'The garrison stores along the waterfront are to be destroyed. Bring the squadron in close and open fire.',
-      'Orders are clear: reduce the coastal fortification to rubble. The army cannot advance until those guns are silenced.',
-    ],
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    flavour: {
+      fair:     ['Enemy artillery on the headland has troubled our ships of the line for too long. In clear weather, bring the squadron in close and open fire — there will be no cover.',
+                 'Orders are clear: reduce the coastal fortification to rubble. The army cannot advance until those guns are silenced.'],
+      foul:     ['The order stands: reduce the shore batteries whatever the weather. Fighting in these seas will make the gun-crews earn their pay.',
+                 'The garrison stores along the waterfront are to be destroyed. In this swell, accurate gunnery will be hard work — but the mission stands.'],
+      obscured: ['Under cover of the fog, the squadron closes with the shore. The guns must speak before visibility returns and the defenders find their range.',
+                 'The haze offers a fleeting chance to close with the shore batteries before they can bring effective fire to bear. Make every shot count.'],
+      default:  ['The garrison stores along the waterfront are to be destroyed. Bring the squadron in close and open fire.'],
+    },
+    deploy: () => '',
     rules: `<strong>Shore Bombardment</strong><br>Place D3+1 Objective Markers on the shoreline to represent the targets of the bombardment. Each Objective Marker has 10 Structure Points.<br><br>Objective Markers may be targeted by Gunnery attacks as though they were stationary ships, but they may not move, evade, or return fire unless represented by a Shore Battery.<br><br>When an Objective Marker is reduced to 0 Structure Points, it is destroyed and removed.`,
     goal: { attacker: 'Destroy the nominated shore targets using ships\' guns.', defender: 'Drive off the attacking squadron before the shore targets are destroyed.' },
   },
@@ -2274,12 +2298,16 @@ const MISSION_TYPES = [
     name: 'Shore Raid',
     icon: '⚓',
     weight: 8,
-    flavour: [
-      'A signal station on the headland has been a thorn in our side for months. Boats and men are to be put ashore to destroy it.',
-      'Enemy stores are stockpiled in the coastal village. A landing party will burn what they can and be back aboard before dawn.',
-      'The raiding party goes ashore under covering fire. Destroy the nominated targets — but if the boats are lost, those men are gone.',
-    ],
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    flavour: {
+      fair:     ['A signal station on the headland has been a thorn in our side for months. The landing party goes ashore in broad daylight — under covering fire, there is nowhere to hide.',
+                 'Enemy stores are stockpiled in the coastal village. A bold daylight raid under the ships\' guns may yet carry it off.'],
+      foul:     ['In the confusion of rough weather, boats are put ashore. The landing party will burn what they can before the sea turns worse.',
+                 'The raiding party goes ashore in heavy weather. The defenders will be slow to muster — but getting the boats back will be hard work.'],
+      obscured: ['The fog provides cover as the boats are lowered in silence. Destroy the nominated targets before the mist lifts and the alarm is raised.',
+                 'A signal station on the headland has been a thorn in our side for months. In this murk, a raiding party may reach the shore undetected.'],
+      default:  ['The raiding party goes ashore under covering fire. Destroy the nominated targets — but if the boats are lost, those men are gone.'],
+    },
+    deploy: () => '',
     rules: BOATS_RULES + `<br><br><strong>Shore Raid</strong><br>Place an Objective Marker on the shoreline to represent the target of the raid. A boat carrying a landing party must land within 6″ of the Objective Marker and remain there. At the end of each of the attacker's turns, while a landing party is at the Objective Marker, make a Skill Check for the landing party.<br><br>• Success: The objective is destroyed. Remove the Objective Marker. The landing party may immediately return to its boat.<br>• Failure: The raid continues. Make another Skill Check at the end of the next attacker's turn.<br><br>A landing party forced to leave the Objective Marker before the objective is destroyed must begin the process again if it returns.`,
     goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
   },
@@ -2288,11 +2316,15 @@ const MISSION_TYPES = [
     name: 'Watering Expedition',
     icon: '💧',
     weight: 8,
-    flavour: [
-      'The squadron is critically short of water. Boats have been sent ashore to the spring — they must be recovered before the enemy closes in.',
-      'At anchor in a sheltered cove, the watering parties are ashore. Intelligence now reports an enemy squadron approaching.',
-      'The hands are ashore filling casks. From the masthead, sails have been sighted. Get the boats back aboard and make sail.',
-    ],
+    flavour: {
+      fair:     ['The hands are ashore filling casks in clear weather. From the masthead, sails have been sighted — they will be on us before the boats return.',
+                 'At anchor in a sheltered cove, the watering parties are ashore. In plain sight under a clear sky, intelligence reports an enemy squadron approaching fast.'],
+      foul:     ['At anchor in a sheltered cove, the watering parties are ashore. In the heavy swell, getting the boats back will be hard work — and the enemy is coming.',
+                 'The squadron is critically short of water. In this weather, the boats struggle at the oars — and from the masthead, sails have been sighted.'],
+      obscured: ['The squadron lies at anchor in the fog, watering parties ashore. Intelligence reports an enemy squadron groping through the same murk — they may be on us before we know it.',
+                 'The hands are ashore filling casks. The fog that hides the approaching enemy also slows the boats. Get them back aboard and be ready to make sail.'],
+      default:  ['The squadron is critically short of water. Boats have been sent ashore to the spring — they must be recovered before the enemy closes in.'],
+    },
     deploy: () => 'Watering ship deploys at anchor within 10″ of the coastline with boats on shore. Friendly ships deploy within 10″ of the watering ship. Enemy squadron deploys on the furthest table edge.',
     rules: BOATS_RULES,
     goal: { attacker: 'Sink or disable the anchored vessels before their boats can return from shore.', defender: 'Recover all boats aboard and escape off the table edge. Begins at anchor. Boats return from Turn 3.' },
@@ -2331,6 +2363,21 @@ const DEPLOYMENT_OPTIONS = [
   { name: 'Southern Approaches', icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true },
   { name: 'Bay Anchorage',     icon: '⚓', edge: 'East',  note: 'Sheltered bay on the east edge. The defender begins at anchor.' },
 ];
+
+function _weatherCategory(w) {
+  if (['Smooth as a Glass Pond', 'Calm'].includes(w.name)) return 'fair';
+  if (['Fog Bank', 'Hazy', 'Heavy Fog'].includes(w.name)) return 'obscured';
+  if (w.name === 'Night Action') return 'night';
+  return 'foul';
+}
+
+function _pickFlavour(mission, weather) {
+  const f = mission.flavour;
+  if (Array.isArray(f)) return f[Math.floor(Math.random() * f.length)];
+  const cat = _weatherCategory(weather);
+  const pool = f[cat] || f.default || [];
+  return pool[Math.floor(Math.random() * pool.length)] || '';
+}
 
 function _weightedPick(arr) {
   const total = arr.reduce((s, x) => s + x.weight, 0);
@@ -2476,7 +2523,7 @@ window.generateMission = function(zone) {
   const effectiveWeather = isNightAction
     ? WEATHER_OPTIONS.find(w => w.name === 'Night Action')
     : weather;
-  const flavour = mission.flavour[Math.floor(Math.random() * mission.flavour.length)];
+  const flavour = _pickFlavour(mission, effectiveWeather);
 
   // Assign attacker/defender based on relative strength
   const stronger = shipsA.length >= shipsB.length ? factionA : factionB;
@@ -2520,7 +2567,7 @@ window.generateMission = function(zone) {
         <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Table Setup</div>
         <div><strong>${deployment.icon} ${deployment.name}</strong>${deployment.edge ? ` — coastline on the <strong>${deployment.edge}</strong> edge` : ''}</div>
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${deployment.note}${shoals ? ' Place D3+3 Shoal Markers within 6″ of the coast.' : ''}</div>
-        <div style="font-size:0.82rem;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${mission.deploy(deployment)}</div>
+        ${(() => { const d = mission.deploy(deployment); return d ? `<div style="font-size:0.82rem;color:var(--text);margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">${d}</div>` : ''; })()}
       </div>
 
       ${merchant ? `
