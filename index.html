@@ -723,6 +723,51 @@ window.adjustTurn = async function(delta) {
       multiUpdate[`/ships/${id}/repairPort`]    = '';
     });
     if (completing.length) showToast(`Turn ${newVal}: ${completing.length} ship(s) returned to active service`);
+
+    // Auto-move convoy one zone toward destination
+    const convoy = appData.convoy || {};
+    const originZone = PORT_ZONE[convoy.origin];
+    const destZone   = PORT_ZONE[convoy.destination];
+    if (originZone && destZone && originZone !== destZone) {
+      const currentZone = convoy.currentZone || originZone;
+      if (currentZone !== destZone) {
+        const dir = destZone > originZone ? 1 : -1;
+        const nextZone = currentZone + dir;
+        const newLocation = `Zone ${nextZone}`;
+        multiUpdate['/convoy/currentZone'] = nextZone;
+
+        // Move all active merchant ships
+        const merchantShips = Object.entries(appData.ships || {}).filter(([,s]) =>
+          (s.player === 'merchant' || s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction)) && s.status === 'active'
+        );
+        merchantShips.forEach(([id]) => { multiUpdate[`/ships/${id}/location`] = newLocation; });
+
+        // Move all escorting squadron ships
+        const escortKeys = [...new Set(merchantShips.map(([,s]) => s.escortedBy).filter(Boolean))];
+        escortKeys.forEach(key => {
+          const [pid, sqn] = key.split('|||');
+          Object.entries(appData.ships || {}).forEach(([id, s]) => {
+            if (s.player === pid && s.squadron === sqn && s.status === 'active') {
+              multiUpdate[`/ships/${id}/location`] = newLocation;
+            }
+          });
+        });
+
+        if (nextZone === destZone) {
+          showToast(`🏁 Convoy has arrived at ${convoy.destination}!`);
+          // Log arrival
+          const logKey = `convoy_arrived_${Date.now()}`;
+          multiUpdate[`/log/${logKey}`] = {
+            type: 'convoy',
+            turn: newVal,
+            timestamp: new Date().toISOString(),
+            text: `Merchant Convoy arrived at ${convoy.destination}.`,
+          };
+        } else {
+          showToast(`⛵ Convoy moved to Zone ${nextZone} (heading to ${convoy.destination})`);
+        }
+      }
+    }
   }
 
   multiUpdate['/meta/movementDone']     = {};
@@ -1114,29 +1159,88 @@ function shipCard(id, s) {
 }
 
 // ─── MERCHANT ─────────────────────────────────────────────────────────────────
+function _convoyZoneLabel(z) { return z ? `Zone ${z}` : '—'; }
+
+function _convoyProgress(originZone, destZone, currentZone) {
+  if (!originZone || !destZone || originZone === destZone) return '';
+  const dir = destZone > originZone ? 1 : -1;
+  const zones = [];
+  for (let z = originZone; dir > 0 ? z <= destZone : z >= destZone; z += dir) zones.push(z);
+  return zones.map(z => {
+    const isOrigin  = z === originZone;
+    const isDest    = z === destZone;
+    const isCurrent = z === currentZone;
+    const isPast    = dir > 0 ? z < currentZone : z > currentZone;
+    const color = isCurrent ? 'var(--accent)' : isPast ? 'var(--green)' : 'var(--text-muted)';
+    const weight = isCurrent ? '700' : '400';
+    const icon = isCurrent ? '⚓' : isPast ? '✓' : isDest ? '🏁' : isOrigin ? '⛵' : '·';
+    return `<span style="color:${color};font-weight:${weight};white-space:nowrap">${icon} Z${z}</span>`;
+  }).join('<span style="color:var(--border);margin:0 3px">›</span>');
+}
+
 function renderMerchant() {
   const ships = Object.entries(appData.ships || {}).filter(([,s]) => s.player === 'merchant' || s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction));
   const players = appData.players || {};
-  // Build list of active player squadrons for escort assignment
-  const escortOptions = [];
+  const convoy = appData.convoy || {};
   const allShips = appData.ships || {};
+
+  // Build escort options
+  const escortOptions = [];
   Object.entries(players).forEach(([pid, p]) => {
     if (p.faction === 'Merchant' || MERCHANT_FACTIONS.includes(p.faction)) return;
     const sqns = [...new Set(Object.values(allShips).filter(s => s.player === pid && s.status === 'active' && s.squadron).map(s => s.squadron))];
     sqns.forEach(sq => escortOptions.push({ key: `${pid}|||${sq}`, label: `${FACTION_FLAG[p.faction]||''} ${p.name} — Sqn ${sq}` }));
-    // Also allow assigning to player without a squadron (all active ships)
     const hasBare = Object.values(allShips).some(s => s.player === pid && s.status === 'active' && !s.squadron);
     if (hasBare) escortOptions.push({ key: `${pid}|||`, label: `${FACTION_FLAG[p.faction]||''} ${p.name} — (no squadron)` });
   });
 
-  const activeShips   = ships.filter(([,s]) => s.status === 'active');
-  const otherShips    = ships.filter(([,s]) => s.status !== 'active');
+  const allPorts = Object.keys(PORT_ZONE).sort();
+  const originZone  = PORT_ZONE[convoy.origin]  || null;
+  const destZone    = PORT_ZONE[convoy.destination] || null;
+  const currentZone = convoy.currentZone || originZone;
+  const arrived     = destZone && currentZone === destZone;
+
+  // Convoy route card
   let html = `<div class="ships-header"><div style="font-size:0.9rem">Merchant Convoy</div>
     <div style="display:flex;gap:6px">
       <button class="btn btn-sm btn-ghost" onclick="clearConvoy()" style="color:var(--red)">Clear Convoy</button>
       <button class="btn btn-sm" onclick="openAddShip('merchant','Merchant')">+ Add Ship</button>
     </div>
-  </div><div class="ship-list">`;
+  </div>
+
+  <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:14px">
+    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Convoy Route</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div class="form-row"><label style="font-size:0.75rem">Origin Port</label>
+        <select id="convoy-origin" onchange="saveConvoyRoute()" style="font-size:0.82rem">
+          <option value="">— Select port —</option>
+          ${allPorts.map(p => `<option value="${p}"${convoy.origin===p?' selected':''}>${p} (Zone ${PORT_ZONE[p]})</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-row"><label style="font-size:0.75rem">Destination Port</label>
+        <select id="convoy-dest" onchange="saveConvoyRoute()" style="font-size:0.82rem">
+          <option value="">— Select port —</option>
+          ${allPorts.map(p => `<option value="${p}"${convoy.destination===p?' selected':''}>${p} (Zone ${PORT_ZONE[p]})</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    ${originZone && destZone && originZone !== destZone ? `
+    <div style="font-size:0.78rem;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+      ${_convoyProgress(originZone, destZone, currentZone)}
+    </div>
+    <div style="font-size:0.78rem;color:${arrived?'var(--green)':'var(--text-muted)'}">
+      ${arrived
+        ? `🏁 Convoy has arrived at ${convoy.destination}`
+        : `Currently in Zone ${currentZone} — ${Math.abs(destZone - currentZone)} zone${Math.abs(destZone-currentZone)!==1?'s':''} remaining`}
+    </div>` : originZone && destZone && originZone === destZone
+      ? `<div style="font-size:0.78rem;color:var(--red)">Origin and destination must be in different zones.</div>` : ''}
+  </div>
+
+  <div class="ship-list">`;
+
+  const activeShips = ships.filter(([,s]) => s.status === 'active');
+  const otherShips  = ships.filter(([,s]) => s.status !== 'active');
+
   if (!ships.length) html += `<div class="empty-state">No merchant ships.</div>`;
   else activeShips.forEach(([id, s]) => {
     const escKey = s.escortedBy || '';
@@ -1153,19 +1257,29 @@ function renderMerchant() {
   });
   if (otherShips.length) {
     html += `<div class="section-label" style="margin-top:12px">Inactive</div>`;
-    otherShips.forEach(([id, s]) => {
-      html += shipCard(id, s);
-    });
+    otherShips.forEach(([id, s]) => { html += shipCard(id, s); });
   }
   html += `</div>`;
   return html;
 }
 
+window.saveConvoyRoute = async function() {
+  const origin = document.getElementById('convoy-origin')?.value || '';
+  const dest   = document.getElementById('convoy-dest')?.value   || '';
+  if (!origin || !dest) return;
+  const oZone = PORT_ZONE[origin], dZone = PORT_ZONE[dest];
+  if (!oZone || !dZone || oZone === dZone) return;
+  const existing = appData.convoy || {};
+  // Reset currentZone if origin changed
+  const currentZone = (existing.origin === origin && existing.currentZone) ? existing.currentZone : oZone;
+  await update(cref('/convoy'), { origin, destination: dest, currentZone });
+  showToast('Convoy route saved');
+};
+
 window.clearConvoy = async function() {
   const ships = Object.entries(appData.ships || {}).filter(([,s]) => s.player === 'merchant' || s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction));
-  if (!ships.length) { showToast('No merchant ships to clear'); return; }
-  if (!confirm(`Remove all ${ships.length} merchant ship(s) from the convoy? This cannot be undone.`)) return;
-  const updates = {};
+  if (!confirm(`Clear the convoy and remove all ${ships.length} merchant ship(s)? This cannot be undone.`)) return;
+  const updates = { '/convoy': null };
   ships.forEach(([id]) => { updates[`/ships/${id}`] = null; });
   await update(cref('/'), updates);
   showToast('Convoy cleared');
