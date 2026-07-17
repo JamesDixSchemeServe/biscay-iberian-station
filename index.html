@@ -2418,11 +2418,33 @@ const WIND_DIRECTIONS = [
 ];
 
 const DEPLOYMENT_OPTIONS = [
-  { name: 'Open Sea',          icon: '🌊', note: 'No coastline. Both sides deploy from opposite short edges.' },
-  { name: 'Portuguese Coast',    icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge.', mayShoal: true },
-  { name: 'Spanish North Coast', icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true },
-  { name: 'Southern Approaches', icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge.', mayShoal: true },
-  { name: 'Bay Anchorage',     icon: '⚓', edge: 'East',  note: 'Sheltered bay on the east edge. The defender begins at anchor.' },
+  // Universal
+  { name: 'Open Sea',              icon: '🌊', note: 'No coastline. Both sides deploy from opposite short edges.' },
+  { name: 'Bay Anchorage',         icon: '⚓', edge: 'East',  note: 'Sheltered bay on the east edge. The defender begins at anchor.' },
+  { name: 'Island Anchorage',      icon: '🏝', edge: 'East',  note: 'A small island sits mid-table. Place D3 Shoal Markers within 6″ of the island. Ships may shelter in its lee.', weight: 4, flavourNote: 'A small island breaks the horizon, its lee offering shelter — or concealment.' },
+  { name: 'Rocky Headland',        icon: '⛰', edge: 'East',  note: 'A rocky promontory juts from the east edge. Place D3+1 Shoal Markers within 6″ of the headland.', mayShoal: false, weight: 4, flavourNote: 'The headland ahead has claimed ships before. Navigation will require care.' },
+  { name: 'Estuary Mouth',         icon: '🌿', edge: 'East',  note: 'A river estuary opens on the east edge. Shallow waters within 6″ of either bank — treat as Shoal Markers. The channel mouth is navigable.', weight: 4, flavourNote: 'The estuary mouth is treacherous — the channel is navigable, but the banks are not.' },
+  { name: 'Fishing Fleet',         icon: '🎣', edge: 'East',  note: 'Place D3+1 small neutral vessels within 12″ of the coastline. They do not move or fight. Treat as wrecks if destroyed — they obstruct movement but cannot be boarded or captured.', weight: 3, flavourNote: 'Neutral fishing vessels work the grounds ahead — an inconvenience at best, a hazard at worst.' },
+  { name: 'Coastal Wreck',         icon: '⚓', edge: 'East',  note: 'A wrecked hull lies grounded within 6″ of the coastline. Treat as a permanent obstruction. Place D3 Shoal Markers within 3″ of the wreck.', mayShoal: false, weight: 3, flavourNote: 'The bones of an earlier casualty mark the shallows — a reminder of what this coast does to the careless.' },
+  // Zone 1 — English Channel
+  { name: 'French Channel Coast',  icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true, zones: [1] },
+  { name: 'English Channel Coast', icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge.', mayShoal: true, zones: [1] },
+  // Zone 2 — North Bay of Biscay
+  { name: 'French Atlantic Coast', icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge.', mayShoal: true, zones: [2] },
+  // Zone 3 — South Bay of Biscay
+  { name: 'French Atlantic Coast', icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge.', mayShoal: true, zones: [3] },
+  { name: 'Spanish North Coast',   icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true, zones: [3] },
+  // Zone 4 — Galician Coast
+  { name: 'Galician Coast',        icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true, zones: [4] },
+  { name: 'Galician Headland',     icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge as the headland rounds toward Vigo.', mayShoal: true, zones: [4] },
+  // Zone 5 — Portuguese Coast
+  { name: 'Portuguese Coast',      icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge.', mayShoal: true, zones: [5] },
+  // Zone 6 — Cadiz Approaches
+  { name: 'Cadiz Approaches',      icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge.', mayShoal: true, zones: [6] },
+  { name: 'Portuguese Algarve',    icon: '🏔', edge: 'East',  note: 'Coastline runs along the east table edge.', mayShoal: true, zones: [6] },
+  // Zone 7 — Gibraltar & Strait
+  { name: 'Strait of Gibraltar',   icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge. The Rock dominates the horizon.', mayShoal: false, zones: [7] },
+  { name: 'Moroccan Coast',        icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true, zones: [7] },
 ];
 
 function _weatherCategory(w) {
@@ -2624,8 +2646,9 @@ window.generateMission = function(zone) {
     : _weightedPick(WIND_DIRECTIONS);
   const shoreRequired = ['cutting_out','reconnaissance','shore_bombardment','shore_raid','watering'].includes(mission.id);
   const deploymentPool = DEPLOYMENT_OPTIONS
+    .filter(d => !d.zones || d.zones.includes(zoneNum))
     .filter(d => !shoreRequired || d.edge)
-    .map(d => ({ ...d, weight: 10 }));
+    .map(d => ({ ...d, weight: d.weight ?? 10 }));
   const deployment  = _weightedPick(deploymentPool);
   const shoals      = deployment.mayShoal && Math.random() < 0.5;
   const isNightAction = mission.id === 'cutting_out';
@@ -2657,7 +2680,7 @@ window.generateMission = function(zone) {
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-zone="${zone.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.zone)">🎲 Regenerate</button>
       </div>
 
-      <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}</p>
+      <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}${deployment.flavourNote ? `<br><br>${deployment.flavourNote}` : ''}</p>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px">
