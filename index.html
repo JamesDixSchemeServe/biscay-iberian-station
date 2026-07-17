@@ -599,7 +599,7 @@ function rebuildNav() {
   nav.innerHTML = `
     <button class="${currentTab==='overview'?'active':''}" onclick="showTab('overview')">Overview</button>
     ${playerBtns}
-    <button class="${currentTab==='merchant'?'active':''}" onclick="showTab('merchant')">Convoy</button>
+    <button class="${currentTab==='merchant'?'active':''}" onclick="showTab('merchant')">Merchant Convoy</button>
     <button class="${currentTab==='log'?'active':''}" onclick="showTab('log')">Dispatches</button>
     <button class="${currentTab==='map'?'active':''}" onclick="showTab('map')">Map</button>
     ${(() => {
@@ -699,7 +699,14 @@ function renderOverview() {
 }
 
 window.adjustTurn = async function(delta) {
-  const newVal = Math.max(1, (appData.meta.turn || 1) + delta);
+  const current = appData.meta.turn || 1;
+  const newVal = Math.max(1, current + delta);
+  if (newVal === current) return;
+  if (delta > 0) {
+    if (!confirm(`Advance to Turn ${newVal}? This will reset movement confirmation and interception rolls.`)) return;
+  } else {
+    if (!confirm(`Go back to Turn ${newVal}? This cannot be undone.`)) return;
+  }
   const multiUpdate = { '/meta/turn': newVal };
 
   // On advance: complete repairs whose availableIn matches the new turn
@@ -771,10 +778,11 @@ function renderPlayer(pid) {
 
   const moveDone = !!((appData.meta||{}).movementDone||{})[pid];
   html += `<div class="ships-header">
-    <div>
-      ${moveDone
-        ? `<span style="color:var(--green);font-size:0.8rem">✓ Movement confirmed</span>`
-        : `<button class="btn btn-sm btn-ghost" onclick="confirmMovement('${pid}')">✓ Confirm Movement</button>`}
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;color:${moveDone?'var(--green)':'var(--text-muted)'}">
+        <input type="checkbox" ${moveDone?'checked':''} onchange="toggleMovement('${pid}', this.checked)" style="width:15px;height:15px;cursor:pointer">
+        Movement confirmed
+      </label>
     </div>
     <button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button>
   </div>`;
@@ -1121,11 +1129,16 @@ function renderMerchant() {
     if (hasBare) escortOptions.push({ key: `${pid}|||`, label: `${FACTION_FLAG[p.faction]||''} ${p.name} — (no squadron)` });
   });
 
+  const activeShips   = ships.filter(([,s]) => s.status === 'active');
+  const otherShips    = ships.filter(([,s]) => s.status !== 'active');
   let html = `<div class="ships-header"><div style="font-size:0.9rem">Merchant Convoy</div>
-    <button class="btn btn-sm" onclick="openAddShip('merchant','Merchant')">+ Add Ship</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-sm btn-ghost" onclick="clearConvoy()" style="color:var(--red)">Clear Convoy</button>
+      <button class="btn btn-sm" onclick="openAddShip('merchant','Merchant')">+ Add Ship</button>
+    </div>
   </div><div class="ship-list">`;
   if (!ships.length) html += `<div class="empty-state">No merchant ships.</div>`;
-  else ships.forEach(([id, s]) => {
+  else activeShips.forEach(([id, s]) => {
     const escKey = s.escortedBy || '';
     const escOpt = escortOptions.find(o => o.key === escKey);
     html += shipCard(id, s);
@@ -1138,9 +1151,25 @@ function renderMerchant() {
       ${escOpt ? `<span style="font-size:0.75rem;color:var(--accent)">✓ Escorted by ${escOpt.label}</span>` : ''}
     </div>`;
   });
+  if (otherShips.length) {
+    html += `<div class="section-label" style="margin-top:12px">Inactive</div>`;
+    otherShips.forEach(([id, s]) => {
+      html += shipCard(id, s);
+    });
+  }
   html += `</div>`;
   return html;
 }
+
+window.clearConvoy = async function() {
+  const ships = Object.entries(appData.ships || {}).filter(([,s]) => s.player === 'merchant' || s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction));
+  if (!ships.length) { showToast('No merchant ships to clear'); return; }
+  if (!confirm(`Remove all ${ships.length} merchant ship(s) from the convoy? This cannot be undone.`)) return;
+  const updates = {};
+  ships.forEach(([id]) => { updates[`/ships/${id}`] = null; });
+  await update(cref('/'), updates);
+  showToast('Convoy cleared');
+};
 
 window.setMerchantEscort = async function(shipId, escortKey) {
   await update(cref(`/ships/${shipId}`), { escortedBy: escortKey });
@@ -1670,6 +1699,12 @@ window.confirmMovement = async function(playerId) {
   renderCurrentTab();
 };
 
+window.toggleMovement = async function(playerId, checked) {
+  await update(cref('/meta/movementDone'), { [playerId]: checked || null });
+  showToast(checked ? 'Movement confirmed' : 'Movement confirmation removed');
+  renderCurrentTab();
+};
+
 function renderInterceptionTab() {
   const meta     = appData.meta    || {};
   const ships    = appData.ships   || {};
@@ -1778,7 +1813,13 @@ function renderInterceptionTab() {
       const flag = FACTION_FLAG[e.faction]||'';
       return `<option value="${encodeURIComponent(e.key)}"${used?' disabled':''}>${flag} ${e.playerName}${e.squadron?` — Sqn ${e.squadron}`:''} (${e.faction})${used?' ✓ used':''}</option>`;
     }).join('');
-    const merchantOpt = merchants.length ? `<option value="__merchant__">🛒 Merchant Convoy (${merchants.reduce((n,e)=>n+e.ships.length,0)} ships)</option>` : '';
+    const merchantEscorts = merchants.flatMap(e => e.ships).map(s => s.escortedBy).filter(Boolean);
+    const escortSqnLabels = [...new Set(merchantEscorts)].map(key => {
+      const sq = sqns.find(e => e.key === decodeURIComponent(key) || e.key === key);
+      return sq ? `${sq.playerName}${sq.squadron ? ` Sqn ${sq.squadron}` : ''}` : null;
+    }).filter(Boolean);
+    const escortNote = escortSqnLabels.length ? ` — escorted by ${escortSqnLabels.join(', ')}` : '';
+    const merchantOpt = merchants.length ? `<option value="__merchant__">🛒 Merchant Convoy (${merchants.reduce((n,e)=>n+e.ships.length,0)} ships${escortNote})</option>` : '';
 
     zonesHtml += `<div class="card" style="margin-bottom:12px" id="izone-${zoneId}">
       <div style="font-weight:700;font-size:0.95rem;margin-bottom:8px">⚓ ${zone}</div>
@@ -1997,6 +2038,9 @@ window.chooseBattle = function(zoneId) {
   if (seekEntry && tgtEntry && (areAllied(seekEntry.faction, tgtEntry.faction) || seekEntry.player === tgtEntry.player)) {
     showToast('Cannot choose battle between allied or same-player squadrons'); return;
   }
+  const seekLabel = seekEntry ? `${seekEntry.playerName}${seekEntry.squadron ? ` Sqn ${seekEntry.squadron}` : ''}` : seekKey;
+  const tgtLabel  = tgtKey === '__merchant__' ? 'Merchant Convoy' : (tgtEntry ? `${tgtEntry.playerName}${tgtEntry.squadron ? ` Sqn ${tgtEntry.squadron}` : ''}` : tgtKey);
+  if (!confirm(`Confirm battle between ${seekLabel} and ${tgtLabel}? This will be recorded as a battle result.`)) return;
 
   if (!appData.meta) appData.meta = {};
   if (!appData.meta.interceptionUsed) appData.meta.interceptionUsed = {};
@@ -2107,6 +2151,33 @@ function renderHistory() {
       for (const s of repairsDone) {
         const p = players[s.player] || {};
         html += `<div style="font-size:0.82rem;padding:3px 0">⚓ <strong>${s.name}</strong> <span style="color:var(--text-muted)">(${p.name||s.player})</span></div>`;
+      }
+    }
+
+    // Ship events this turn — sunk, captured, sold, lost
+    const shipEvents = Object.values(ships).filter(s => s.lostAtTurn === t);
+    if (shipEvents.length) {
+      html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Ship Events</div>`;
+      for (const s of shipEvents) {
+        const owner = players[s.player] || {};
+        let icon = '💥', desc = '';
+        if (s.status === 'sunk') {
+          icon = '💥';
+          if (s.sunkBy === '__accident__') desc = 'Lost — accident';
+          else if (s.sunkBy === '__lost_on_passage__') desc = 'Lost on passage';
+          else {
+            const sinker = ships[s.sunkBy];
+            desc = `Sunk${sinker ? ` by ${sinker.name}` : ''}`;
+          }
+        } else if (s.status === 'lost') {
+          icon = '⚔';
+          const captor = ships[s.capturedBy];
+          desc = `Captured${captor ? ` by ${captor.name}` : ''}`;
+        } else if (s.status === 'sold') {
+          icon = '💰';
+          desc = 'Sold';
+        }
+        html += `<div style="font-size:0.82rem;padding:3px 0">${icon} <strong>${s.name}</strong> <span style="color:var(--text-muted)">(${owner.name||s.player})</span> — ${desc}</div>`;
       }
     }
 
@@ -2229,7 +2300,7 @@ const MISSION_TYPES = [
                 'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.'],
     },
     deploy: (d) => d.edge ? `The Target Ship deploys at anchor within 6″ of ${d.anchorLabel || `the ${d.edge} coastline`}. The attacker deploys on any table edge. All other defending ships deploy at anchor at least 10″ from the Target Ship and may not be deployed between the Target Ship and the attacker's chosen table edge.` : `The Target Ship deploys at anchor in the centre of the table. The attacker deploys on any table edge. All other defending ships deploy at anchor at least 10″ from the Target Ship and may not be deployed between the Target Ship and the attacker's chosen table edge.`,
-    rules: BOATS_RULES + `<br><br><strong>Silent Approach</strong><br>Once any attacking ship or Boat Marker is within 10″ of the Target Ship, at the end of each attacker's turn both admirals make a Skill Check. The attacking admiral receives +2. If the attacker wins or the result is tied, the alarm has not been raised. If the defender wins, the alarm is raised. The alarm is also raised immediately if either player makes a Gunnery attack or an attacking ship or Boat Marker initiates a boarding action.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move or initiate boarding actions, but may fire in self-defence or defend themselves if boarded. Once the alarm has been raised, all defending ships may act normally from their next activation.`,
+    rules: BOATS_RULES + `<br><br><strong>Silent Approach</strong><br>Once any attacking ship or Boat Marker is within 10″ of the Target Ship, at the end of each attacker's turn both admirals make a Skill Check. The attacking admiral receives +2. If the attacker wins or the result is tied, the alarm has not been raised. If the defender wins, the alarm is raised. The alarm is also raised immediately if either player makes a Gunnery attack or an attacking ship or Boat Marker initiates a boarding action.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move or initiate boarding actions, but may return fire if fired on, or defend themselves if boarded. Once the alarm has been raised, all defending ships may act normally from their next activation.`,
     goal: { attacker: 'Row in by boat, board the nominated target vessel at anchor, and sail her clear of the table.', defender: 'Raise the alarm and drive off the raiders before the ship is taken.' },
   },
   {
@@ -2281,7 +2352,7 @@ const MISSION_TYPES = [
                  'The coast is obscured, the charts are wrong, and the enemy is somewhere close. Get in, observe, and get out.'],
       default:  ['A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.'],
     },
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    deploy: () => 'Place Points of Interest markers on shore first. The attacker then chooses a table edge and deploys within 12″ of it. The defender deploys on the opposite table edge.',
     rules: `<strong>Points of Interest</strong><br>Place D3+3 markers on shore to represent points of interest.<br><br>To investigate a Point of Interest, a friendly ship must move within 12″ of it and remain there until the start of its next activation. Once investigated, remove the Point of Interest.`,
     goal: { attacker: 'Investigate all Points of Interest and safely withdraw at least one investigating ship from the board.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
@@ -2299,7 +2370,7 @@ const MISSION_TYPES = [
                  'The haze offers a fleeting chance to close with the shore batteries before they can bring effective fire to bear. Make every shot count.'],
       default:  ['The garrison stores along the waterfront are to be destroyed. Bring the squadron in close and open fire.'],
     },
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    deploy: () => 'Place Objective Markers on shore first. The attacker then chooses a table edge and deploys within 12″ of it. The defender deploys on the opposite table edge.',
     rules: `<strong>Shore Bombardment</strong><br>Place D3+1 Objective Markers on the shoreline to represent the targets of the bombardment. Each Objective Marker has 10 Structure Points.<br><br>Objective Markers may be targeted by Gunnery attacks as though they were stationary ships, but they may not move, evade, or return fire unless represented by a Shore Battery.<br><br>When an Objective Marker is reduced to 0 Structure Points, it is destroyed and removed.`,
     goal: { attacker: 'Destroy the nominated shore targets using ships\' guns.', defender: 'Drive off the attacking squadron before the shore targets are destroyed.' },
   },
@@ -2354,8 +2425,8 @@ const WEATHER_OPTIONS = [
   { name: 'Heavy Storm',            icon: '⛈',  weight: 10, note: '−2 to all shooting.<br>Maximum sail level: Light Sails.<br>Adrift rate of knots +2.' },
   { name: 'Drifting Fog',           icon: '🌁', weight: 8,  note: 'Templates move 3 ROK with the wind.<br>−2 to hit.' },
   { name: 'Rain Squalls',           icon: '🌧', weight: 8,  note: 'Templates move 3 ROK with the wind.<br>−1 to hit.' },
-  { name: 'Hazy',                   icon: '🌫', weight: 5,  note: 'Maximum visibility 12″.<br>−1 to all shooting.' },
-  { name: 'Heavy Fog',              icon: '🌫', weight: 4,  note: 'Maximum visibility 12″.<br>−2 to all shooting.' },
+  { name: 'Hazy',                   icon: '🌫', weight: 5,  note: 'Maximum visibility 14″.<br>−1 to all shooting.' },
+  { name: 'Heavy Fog',              icon: '🌫', weight: 4,  note: 'Maximum visibility 10″.<br>−2 to all shooting.' },
   { name: 'Night Action',           icon: '🌙', weight: 5,  note: 'Maximum visibility 6″.<br>−2 to all shooting.<br>Maximum sail level: Light Sails.' },
   { name: 'Northerly Swell',        icon: '🧭', weight: 4,  lockWind: 'North', note: 'ROKs +1.<br>Do not roll for wind change this game.<br>−1 to all shooting.<br>Wind direction locked to North.' },
   { name: 'Levanter',               icon: '🌬', weight: 0,  lockWind: 'East',  note: 'ROKs +1.<br>Do not roll for wind change this game.<br>−1 to all shooting.<br>Wind direction locked to East.' },
@@ -2380,8 +2451,8 @@ const DEPLOYMENT_OPTIONS = [
   { name: 'Island Anchorage',      icon: '🏝', edge: 'East',  note: 'A small island sits mid-table. Place D3 Shoal Markers within 6″ of the island.', anchorLabel: 'the island', cuttingOut: true, weight: 4, flavourNote: 'A small island breaks the horizon, its lee offering shelter — or concealment.' },
   { name: 'Rocky Headland',        icon: '⛰', edge: 'East',  note: 'Coastline runs along the east table edge. A rocky promontory juts out. Place D3+1 Shoal Markers within 6″ of the headland.', mayShoal: false, cuttingOut: true, weight: 4, flavourNote: 'The headland ahead has claimed ships before. Navigation will require care.' },
   { name: 'Estuary Mouth',         icon: '🌿', edge: 'East',  note: 'Coastline runs along the east table edge. A river estuary opens up. There are shallow waters within 6″ of either bank. The channel mouth is navigable.', cuttingOut: true, weight: 4, flavourNote: 'The estuary mouth is treacherous — the channel is navigable, but the banks are not.' },
-  { name: 'Fishing Fleet',         icon: '🎣', edge: 'East',  note: 'Coastline runs along the east table edge. Place D3+1 small neutral vessels within 12″ of the coastline. They do not move or fight but will drift. Treat as wrecks if destroyed — they obstruct movement but cannot be boarded or captured.', weight: 3, flavourNote: 'Neutral fishing vessels work the grounds ahead — an inconvenience at best, a hazard at worst.' },
-  { name: 'Coastal Wreck',         icon: '⚓', edge: 'East',  note: 'Coastline runs along the east table edge. A wrecked hull lies grounded within 6″ of the coastline. Treat as a permanent obstruction. Place D3 Shoal Markers within 3″ of the wreck.', mayShoal: false, weight: 3, flavourNote: 'The bones of an earlier casualty mark the shallows — a reminder of what this coast does to the careless.' },
+  { name: 'Fishing Fleet',         icon: '🎣', edge: 'East',  note: 'Coastline runs along the east table edge. Place D3+1 small neutral vessels within 12″ of the coastline. They do not move or fight but will drift. Treat as wrecks if destroyed — they obstruct movement but cannot be boarded or captured.', cuttingOut: true, weight: 3, flavourNote: 'Neutral fishing vessels work the grounds ahead — an inconvenience at best, a hazard at worst.' },
+  { name: 'Coastal Wreck',         icon: '⚓', edge: 'East',  note: 'Coastline runs along the east table edge. A wrecked hull lies grounded within 6″ of the coastline. Treat as a permanent obstruction. Place D3 Shoal Markers within 3″ of the wreck.', mayShoal: false, cuttingOut: true, weight: 3, flavourNote: 'The bones of an earlier casualty mark the shallows — a reminder of what this coast does to the careless.' },
   // Zone 1 — English Channel
   { name: 'French Channel Coast',  icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true, zones: [1] },
   { name: 'English Channel Coast', icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge.', mayShoal: true, zones: [1] },
@@ -2405,7 +2476,7 @@ const DEPLOYMENT_OPTIONS = [
 
 function _weatherCategory(w) {
   if (['Smooth as a Glass Pond', 'Calm'].includes(w.name)) return 'fair';
-  if (['Drifting Fog', 'Hazy', 'Heavy Fog'].includes(w.name)) return 'obscured';
+  if (['Drifting Fog', 'Hazy', 'Heavy Fog', 'Rain Squalls'].includes(w.name)) return 'obscured';
   if (w.name === 'Night Action') return 'night';
   return 'foul';
 }
@@ -2601,15 +2672,18 @@ window.generateMission = function(zone) {
     ? WIND_DIRECTIONS.find(w => w.dir === weather.lockWind) || _weightedPick(WIND_DIRECTIONS)
     : _weightedPick(WIND_DIRECTIONS);
   const shoreRequired = ['cutting_out','reconnaissance','shore_bombardment','shore_raid','watering'].includes(mission.id);
+  const coastOrIslandRequired = mission.id === 'watering';
   const deploymentPool = DEPLOYMENT_OPTIONS
     .filter(d => !d.zones || d.zones.includes(zoneNum))
     .filter(d => !shoreRequired || d.edge)
     .filter(d => mission.id !== 'cutting_out' || d.cuttingOut)
+    .filter(d => !coastOrIslandRequired || d.edge)
     .map(d => ({ ...d, weight: d.weight ?? 10 }));
   const deployment  = _weightedPick(deploymentPool);
   const shoals      = deployment.mayShoal && Math.random() < 0.5;
-  const isNightAction = mission.id === 'cutting_out';
-  const effectiveWeather = isNightAction
+  const cuttingOutWeathers = ['Night Action', 'Heavy Fog', 'Hazy'];
+  const isCuttingOut = mission.id === 'cutting_out';
+  const effectiveWeather = isCuttingOut && !cuttingOutWeathers.includes(weather.name)
     ? WEATHER_OPTIONS.find(w => w.name === 'Night Action')
     : weather;
   const flavour = _pickFlavour(mission, effectiveWeather, phase);
@@ -3969,7 +4043,7 @@ window.saveShip = async function(id) {
     const capturingOwner = capturingPlayer ? (appData.players || {})[capturingPlayer] : null;
     const capturingName = capturingOwner ? capturingOwner.name : (enemyShip ? enemyShip.player : 'Unknown');
     if (!confirm(`Mark ${data.name} as captured${enemyShip ? ` by ${enemyShip.name}` : ''}?\n\n• This ship stays in your roster as Lost\n• A prize copy will be created for ${capturingName} pending prize decision`)) return;
-    const lostData = { ...data, status: 'lost', squadron: '', repairPort: '', availableIn: '' };
+    const lostData = { ...data, status: 'lost', squadron: '', repairPort: '', availableIn: '', lostAtTurn: (appData.meta||{}).turn || 1 };
     const prizeData = {
       ...existing,
       status: 'captured',
@@ -4017,6 +4091,9 @@ window.saveShip = async function(id) {
     }
   }
 
+  if (['sunk','sold','lost'].includes(data.status) && !['sunk','sold','lost'].includes((appData.ships||{})[id]?.status)) {
+    data.lostAtTurn = (appData.meta||{}).turn || 1;
+  }
   await set(cref(`/ships/${id}`), data);
   closeModal();
   showToast(data.player !== existing.player ? 'Ship transferred — pending prize decision' : 'Ship updated');
