@@ -440,8 +440,8 @@ const SEED = {
   meta: { turn: 3, phase: 1 },
   players: {
     ethan:  { name:'Ethan',  faction:'British', resources:864, officerName:'Thomas Harrington',     rank:'Master and Commander', admiraltyFavour:1 },
-    cal:    { name:'Cal',    faction:'Spanish', resources:508, officerName:'Don Rafael Quintana',    rank:'Master and Commander', admiraltyFavour:0 },
-    dixieF: { name:'Dixie',  faction:'French',  resources:695, officerName:'Étienne-Henri Valois',   rank:'Master and Commander', admiraltyFavour:0 },
+    cal:    { name:'Cal',    faction:'Spanish', resources:508, officerName:'Don Rafael Quintana',    rank:'Capitán de fragata',   admiraltyFavour:0 },
+    dixieF: { name:'Dixie',  faction:'French',  resources:695, officerName:'Étienne-Henri Valois',   rank:'Capitaine de frégate', admiraltyFavour:0 },
     dixieB: { name:'Dixie',  faction:'British', resources:814, officerName:'Jonathan Fairleigh',     rank:'Master and Commander', admiraltyFavour:0 },
   },
   ships: {
@@ -798,7 +798,8 @@ window.adjustTurn = async function(delta) {
       if (logEntries.some(l => l.type === 'convoy_lost')) phaseWarnings.push('A Merchant Convoy has been destroyed or taken as prizes');
     } else if (phase === 2) {
       if (logEntries.filter(l => l.type === 'convoy_lost').length >= 2) phaseWarnings.push('A second Merchant Convoy has been destroyed');
-      if (logEntries.some(l => l.type === 'officer_death' && l.wasSenior)) phaseWarnings.push('A Post Captain has been killed in action');
+      const seniorKilled = logEntries.filter(l => l.type === 'officer_death' && l.wasSenior);
+      if (seniorKilled.length) phaseWarnings.push(`A senior officer has been killed in action (${seniorKilled.map(l => l.officerName).join(', ')})`);
     }
     if (phaseWarnings.length) _showPhaseWarning(phase, phaseWarnings);
   }
@@ -881,14 +882,15 @@ function renderPlayer(pid) {
   const isSeniorRank = pRank === _ranksForFaction(p.faction)[1];
   const activeRated = active.filter(([,s]) => _isRated(s.type));
   const hasFlagship = active.some(([,s]) => s.flagship === true);
+  const factionRanks = _ranksForFaction(p.faction);
   if (!isSeniorRank && activeRated.length > 0) {
     html += `<div style="background:rgba(200,50,50,0.1);border:1px solid var(--red);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;color:var(--red)">
-      ⚠ A Master and Commander may not command Rated ships. ${activeRated.length} Rated ship${activeRated.length>1?'s':''} must be transferred or this officer promoted.
+      ⚠ A ${factionRanks[0]} may not command Rated ships. ${activeRated.length} Rated ship${activeRated.length>1?'s':''} must be transferred or this officer promoted to ${factionRanks[1]}.
     </div>`;
   }
   if (isSeniorRank && activeRated.length > 0 && !hasFlagship) {
     html += `<div style="background:rgba(200,130,30,0.1);border:1px solid var(--accent);border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:0.82rem;color:var(--accent)">
-      ⚠ A Post Captain commanding Rated ships must designate one as Flagship. Use the ☆ button on a Rated ship.
+      ⚠ A ${factionRanks[1]} commanding Rated ships must designate one as Flagship. Use the ☆ button on a Rated ship.
     </div>`;
   }
 
@@ -4421,7 +4423,7 @@ window.saveNewShip = async function() {
       const ranks = _ranksForFaction(player.faction);
       const isSenior = player.rank === ranks[1];
       if (!isSenior) {
-        if (!confirm(`Warning: ${shipType} is a Rated vessel.\n\nA Master and Commander may not command Rated ships — this officer must be promoted to ${ranks[1]} first.\n\nAdd this ship anyway?`)) return;
+        if (!confirm(`Warning: ${shipType} is a Rated vessel.\n\nA ${ranks[0]} may not command Rated ships — this officer must be promoted to ${ranks[1]} first.\n\nAdd this ship anyway?`)) return;
       }
     }
     if (!confirm(`Purchase ${name} for ${cost} resources?\n\nRemaining after purchase: ${currentRes - cost} resources`)) return;
