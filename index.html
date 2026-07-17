@@ -2391,6 +2391,12 @@ const MISSION_TYPES = [
   },
 ];
 
+const RANDOM_QUOTES = [
+  { text: '"For England, for home, and for the prize!"',                                                              missions: ['fleet_action','commerce_raid','blockade_run','dispatches'] },
+  { text: '"Do you not know that in the service … one must always choose the lesser of two weevils?"',               missions: null },
+  { text: '"Subject to the requirements of the service."',                                                            missions: null },
+];
+
 const WEATHER_OPTIONS = [
   { name: 'Smooth as a Glass Pond', icon: '🪞', weight: 13, note: '+1 to all shooting.' },
   { name: 'Calm',                   icon: '☀',  weight: 30, note: 'No modifiers apply.' },
@@ -2680,7 +2686,7 @@ window.generateMission = function(zone) {
         <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-zone="${zone.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.zone)">🎲 Regenerate</button>
       </div>
 
-      <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}${deployment.flavourNote ? `<br><br>${deployment.flavourNote}` : ''}</p>
+      <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}${deployment.flavourNote ? `<br><br>${deployment.flavourNote}` : ''}${['Drifting Fog','Heavy Fog','Hazy'].includes(effectiveWeather.name) && Math.random() < 0.4 ? '<br><br>"It was only for a moment. I thought I saw a shape."' : ''}${(() => { const pool = RANDOM_QUOTES.filter(q => !q.missions || q.missions.includes(mission.id)); const q = pool.length && Math.random() < 0.25 ? pool[Math.floor(Math.random()*pool.length)] : null; return q ? `<br><br>${q.text}` : ''; })()}</p>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <div style="background:var(--surface2);border-radius:6px;padding:12px">
