@@ -517,8 +517,6 @@ async function connect(cfg) {
     const app = initializeApp(cfg);
     await signInAnonymously(getAuth(app));
     db = getDatabase(app);
-    // Migrate first (moves root data into /campaigns/default/ if needed), then seed if still empty
-    await runMigrations();
     const snap = await get(cref('/'));
     if (!snap.exists()) {
       await set(cref('/'), { meta: { turn: 1, phase: 1 } });
@@ -535,54 +533,6 @@ async function connect(cfg) {
   }
 }
 
-async function runMigrations() {
-  try {
-    // v2: lift root-level data into /campaigns/default/ (one-time after namespacing refactor)
-    // Re-runs if flag is set but campaign still lacks players/ships (handles the bad-boot-order case)
-    const rootSnap = await get(ref(db, '/'));
-    const root = rootSnap.val() || {};
-    const keysToMigrate = ['ships', 'players', 'log', 'meta'];
-    const hasMigratable = keysToMigrate.some(k => root[k] && k !== 'migrations' && k !== 'campaigns');
-    const campaignSnap = await get(ref(db, '/campaigns/default'));
-    const campaignData = campaignSnap.val() || {};
-    const campaignIsEmpty = !campaignData.ships && !campaignData.players;
-    if (hasMigratable && campaignIsEmpty) {
-      const updates = {};
-      for (const k of keysToMigrate) {
-        if (root[k]) updates[`/campaigns/default/${k}`] = root[k];
-      }
-      updates['/migrations/v2_namespace'] = true;
-      for (const k of keysToMigrate) {
-        if (root[k]) updates[`/${k}`] = null;
-      }
-      await update(ref(db, '/'), updates);
-      console.log('v2 migration: root data moved to /campaigns/default/');
-    } else if (!root.migrations?.v2_namespace) {
-      await update(ref(db, '/'), { '/migrations/v2_namespace': true });
-    }
-  } catch(e) { console.warn('Migration v2 failed:', e); }
-
-  try {
-    const migSnap = await get(ref(db, '/migrations/v1_capture_links'));
-    if (migSnap.exists()) return;
-    // Patch known capture/sunk relationships from initial data
-    const patches = {
-      'ships/bl1': { status: 'sunk', capturedBy: 'fd1' },
-      'ships/bl2': { status: 'sunk', capturedBy: 'fd3' },
-      'ships/bl3': { status: 'sunk', sunkBy: 'fd5' },
-      'ships/fl1': { status: 'sunk', sunkBy: '__accident__' },
-      'ships/sl1': { status: 'sunk', capturedBy: 'bs9' },
-    };
-    const updates = {};
-    for (const [path, fields] of Object.entries(patches)) {
-      for (const [k, v] of Object.entries(fields)) {
-        updates[`${path}/${k}`] = v;
-      }
-    }
-    updates['migrations/v1_capture_links'] = true;
-    await update(ref(db, '/'), updates);
-  } catch(e) { console.warn('Migration v1 failed:', e); }
-}
 
 
 window.saveConfig = function() {
