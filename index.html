@@ -2264,7 +2264,7 @@ const MISSION_TYPES = [
     merchants: [
       { name: 'Small Merchant', type: 'Merchantman', sp: 20, broadside: '1L', rok: 4, value: 50, weight: 40, rig: 'Square', crew: 'Inexperienced', special: null },
       { name: 'Large Merchant', type: 'Merchantman', sp: 30, broadside: '2L', rok: 4, value: 100, weight: 35, rig: 'Square', crew: 'Inexperienced', size: 'L', special: null },
-      { name: 'Powder Ship',    type: 'Indiaman',    sp: 30, broadside: '—',  rok: 4, value: 150, weight: 25, rig: 'Square', crew: 'Inexperienced', special: 'POWDER SHIP: Any damage — roll a D6. On a natural 1, the ship explodes causing 2D10 damage to all ships within 10″ and D10 to all ships within 10″–20″.' },
+      { name: 'Powder Ship',    type: 'Indiaman',    sp: 30, broadside: '—',  rok: 4, value: 150, weight: 25, rig: 'Square', crew: 'Inexperienced', special: 'POWDER SHIP: Whenever the ship suffers damage from shooting, roll a D6 after resolving the attack. On a natural roll of 1, the ship explodes and is immediately destroyed. Every ship within 10″ suffers 2D10 damage, while every ship between 10″ and 20″ suffers D10 damage.' },
     ],
     goal: { attacker: 'Destroy or capture the designated merchant vessel before she reaches safety.', defender: 'Escort the merchant to safety — she must not be taken or sunk.' },
   },
@@ -2297,7 +2297,7 @@ const MISSION_TYPES = [
       default:  ['Intelligence has reached us that the enemy courier is at sea. Intercept her before she delivers her despatches.'],
     },
     deploy: () => 'Squadrons deploy on opposite short table edges.',
-    vessel: { name: 'Dispatch Cutter', type: 'Cutter', sp: 13, broadside: '1L', rok: 6, rig: 'Fore-and-aft', crew: 'Regular', size: 'S', breakpoint: 3 },
+    vessel: { name: 'Dispatch Cutter', type: 'Cutter', sp: 13, broadside: '1L', rok: 6, rig: 'Fore-and-aft', crew: 'Regular', size: 'S', breakpoint: 3, value: 50 },
     goal: { attacker: 'Intercept and capture the nominated target vessel before she escapes.', defender: 'Get the nominated vessel off the far table edge intact.' },
   },
   {
@@ -2737,6 +2737,7 @@ window.generateMission = function(zone) {
             <div class="gs-item"><div class="gs-label">Knots</div><div class="gs-val">${vessel.rok}</div></div>
             <div class="gs-item"><div class="gs-label">Break</div><div class="gs-val">${vessel.breakpoint || Math.ceil(vessel.sp * 0.4)}</div></div>
           </div>
+          ${vessel.value ? `<div style="margin-top:6px;padding:8px;background:rgba(180,150,50,0.1);border-left:3px solid var(--accent);border-radius:3px;font-size:0.78rem;color:var(--accent)">💰 If captured, the attacker gains <strong>${vessel.value} resources</strong>.</div>` : ''}
         </div>
       </div>` : ''}
 
@@ -2767,6 +2768,7 @@ window.generateMission = function(zone) {
             <div class="gs-item"><div class="gs-label">Break</div><div class="gs-val">${Math.ceil(merchant.sp * 0.4)}</div></div>
           </div>
           ${merchant.special ? `<div style="margin-top:6px;padding:8px;background:rgba(220,50,50,0.1);border-left:3px solid var(--red);border-radius:3px;font-size:0.78rem;color:var(--red)">${merchant.special}</div>` : ''}
+          ${merchant.value ? `<div style="margin-top:6px;padding:8px;background:rgba(180,150,50,0.1);border-left:3px solid var(--accent);border-radius:3px;font-size:0.78rem;color:var(--accent)">💰 If captured, the attacker gains <strong>${merchant.value} resources</strong>.</div>` : ''}
         </div>
       </div>` : ''}
 
