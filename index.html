@@ -2751,6 +2751,47 @@ function renderRules() {
   </div>`;
 }
 
+window.openCampaignModal = function() {
+  showModal(`
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Campaign Management</h2>
+    <div style="margin-bottom:16px">
+      <div style="font-weight:600;margin-bottom:4px">Current Campaign</div>
+      <div style="font-size:0.88rem;color:var(--text-muted)">ID: <strong style="color:var(--text)">${campaignId}</strong></div>
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0">
+    <div style="font-weight:600;margin-bottom:4px">Clone From Another Campaign</div>
+    <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px">Copy all data from another campaign into <strong>${campaignId}</strong>. This will overwrite all current data.</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="clone-src-id" type="text" placeholder="Source campaign ID" style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.88rem">
+      <button class="btn" onclick="confirmClone()">Clone</button>
+    </div>
+    <div id="clone-status" style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;min-height:1.2em"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
+  `);
+};
+
+window.confirmClone = async function() {
+  const src = (document.getElementById('clone-src-id').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+  const status = document.getElementById('clone-status');
+  if (!src) { status.textContent = 'Enter a source campaign ID.'; return; }
+  if (src === campaignId) { status.textContent = 'Source and destination are the same campaign.'; return; }
+  if (!confirm(`This will overwrite ALL data in "${campaignId}" with data from "${src}". This cannot be undone. Continue?`)) return;
+  status.textContent = 'Checking source campaign…';
+  try {
+    const srcSnap = await get(ref(db, `/campaigns/${src}`));
+    if (!srcSnap.exists()) { status.textContent = `No campaign found with ID "${src}".`; return; }
+    status.textContent = 'Copying data…';
+    await set(ref(db, `/campaigns/${campaignId}`), srcSnap.val());
+    status.style.color = 'var(--green)';
+    status.textContent = `Done — campaign cloned from "${src}". Reloading…`;
+    setTimeout(() => location.reload(), 1500);
+  } catch(e) {
+    status.style.color = 'var(--red)';
+    status.textContent = 'Error: ' + e.message;
+  }
+};
+
 function renderLog() {
   const log = appData.log || {};
   const entries = Object.entries(log).sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
