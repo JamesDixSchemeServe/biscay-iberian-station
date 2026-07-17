@@ -2367,7 +2367,7 @@ const MISSION_TYPES = [
                  'A signal station on the headland has been a thorn in our side for months. In this murk, a raiding party may reach the shore undetected.'],
       default:  ['The raiding party goes ashore under covering fire. Destroy the nominated targets — but if the boats are lost, those men are gone.'],
     },
-    deploy: () => 'Squadrons deploy on opposite short table edges.',
+    deploy: () => 'Raiding ship deploys at anchor at least 12″ from the objective with maximum boats in the water in base contact. Friendly ships deploy within 10″ of the raiding ship. The defending squadron deploys on the furthest table edge.',
     rules: BOATS_RULES + `<br><br><strong>Shore Raid</strong><br>Place an Objective Marker on the shoreline to represent the target of the raid. A boat carrying a landing party must land within 6″ of the Objective Marker and remain there. At the end of each of the attacker's turns, while a landing party is at the Objective Marker, make a Skill Check for the landing party, adding +1 to the roll for each previous Skill Check made during the current attempt.<br><br>• Success: The objective is destroyed. Remove the Objective Marker. The landing party may immediately return to its boat.<br>• Failure: The raid continues. Make another Skill Check at the end of the next attacker's turn.<br><br>A landing party forced to leave the Objective Marker before the objective is destroyed must begin the process again if it returns.`,
     goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
   },
