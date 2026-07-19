@@ -373,15 +373,14 @@
 
 <div class="toast" id="toast"></div>
 
-<!-- Fallback: if Firebase module fails to load, show setup screen -->
+<!-- Fallback: if Firebase takes too long, show a connection error -->
 <script>
 setTimeout(function() {
   var l = document.getElementById('loading');
   if (l && l.style.display !== 'none') {
-    l.style.display = 'none';
-    document.getElementById('setup-screen').style.display = 'block';
+    l.innerHTML = '<div style="color:#e05555;padding:20px;text-align:center">Connection is taking longer than expected.<br><br><button onclick="location.reload()" style="margin-top:8px;padding:6px 16px;background:#c8a84b;color:#1a1208;border:none;border-radius:4px;cursor:pointer">Retry</button></div>';
   }
-}, 5000);
+}, 12000);
 </script>
 
 <!-- Firebase SDK -->
@@ -2424,7 +2423,7 @@ window.saveTurnNote = async function(turn) {
 };
 
 // ─── ORDERS / MISSION GENERATOR ──────────────────────────────────────────────
-const BOATS_RULES = `<strong>Boats</strong><br>Ships may deploy one Boat Marker for every 10 Ship Points. Once deployed, Boat Markers activate according to the Weather Gauge and move 3 RoK. Boats may initiate boarding actions without making a Skill Check and contribute 1 Boarding Die each, in accordance with the boarding rules.<br><br>Boats may be targeted by Gunnery attacks but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns ignore these restrictions and may target boats normally.<br><br>If all of a ship's Boat Markers are destroyed or otherwise lost during the game, the parent ship immediately suffers one Crew Hit.`;
+const BOATS_RULES = `<strong>Boats</strong><br>A ship may deploy one Boat Marker for every 10 Ship Points. Once deployed, Boat Markers activate according to the Weather Gauge, move 3 RoK under oars, and have 2SP each. Boats may initiate boarding actions without making a Skill Check and contribute 1 Boarding Die each, in accordance with the boarding rules.<br><br>Boats may be targeted by Gunnery attacks but may only be hit on a natural roll of 1, regardless of any modifiers. Ships may not target boats with broadside guns at Point Blank range (within 3″), as the guns cannot be sufficiently depressed. Muskets and swivel guns ignore these restrictions and may target boats normally.<br><br>If all of a ship's Boat Markers are destroyed or otherwise lost during the game, the parent ship immediately suffers one Crew Hit.`;
 
 const MISSION_TYPES = [
   {
