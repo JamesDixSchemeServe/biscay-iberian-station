@@ -35,7 +35,7 @@
   .turn-badge span { color: var(--accent); font-weight: bold; }
 
   /* Nav tabs */
-  nav { display: flex; flex-direction: column; background: var(--surface); border-bottom: 1px solid var(--border); }
+  nav { display: flex; flex-direction: column; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
   .nav-row { display: flex; align-items: center; overflow-x: auto; gap: 2px; padding: 0 8px; }
   .nav-row + .nav-row { border-top: 1px solid var(--border); }
   .nav-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding: 0 10px 0 4px; opacity: 0.6; white-space: nowrap; border-right: 1px solid var(--border); margin-right: 4px; }
