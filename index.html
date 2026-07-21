@@ -588,6 +588,7 @@ function renderCurrentTab() {
         });
         break;
       case 'orders':        c.innerHTML = renderOrders(); break;
+      case 'history':       c.innerHTML = renderHistory(); break;
       case 'rules':         c.innerHTML = renderRules(); break;
       default:         c.innerHTML = renderOverview(); break;
     }
@@ -619,6 +620,7 @@ function rebuildNav() {
       return `<button class="${cls}" onclick="${allConfirmed?`showTab('interception')`:`showToast('Movement not confirmed: '+${JSON.stringify(pending)})`}">⚔ Interception</button>`;
     })()}
     <button class="${currentTab==='orders'?'active':''}" onclick="showTab('orders')">⚓ Orders</button>
+    <button class="${currentTab==='history'?'active':''}" onclick="showTab('history')">📜 History</button>
     <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>
   `;
 }
@@ -2352,104 +2354,120 @@ function renderHistory() {
     }
   }
 
-  let html = `<div class="ships-header"><div>Campaign History</div></div>`;
+  const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧', promotion:'🎖' };
+  const officerEventTypes = new Set(['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned','promotion']);
+
+  let html = `<div class="section-header"><h2>📜 Campaign History</h2></div>`;
 
   for (const t of turns) {
-    const dispatches = dispatchByTurn[t] || [];
-    const repairsDone = repairsCompletedByTurn[t] || [];
-    const noteText = notes[t] || '';
+    const dispatches   = dispatchByTurn[t] || [];
+    const repairsDone  = repairsCompletedByTurn[t] || [];
+    const noteText     = notes[t] || '';
+    const shipEvents   = Object.values(ships).filter(s => s.lostAtTurn === t);
+    const officerEvents = Object.values(appData.log||{}).filter(l => l.turn === t && officerEventTypes.has(l.type));
+    const interceptions = ((appData.meta || {}).interceptionLog || {})[t] || [];
+    const hasActivity  = dispatches.length || repairsDone.length || shipEvents.length || officerEvents.length || interceptions.length || noteText;
 
-    html += `<div class="card" style="margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="card-title" style="margin:0">Turn ${t}</div>
-        <button class="btn btn-sm btn-ghost" onclick="openTurnNote(${t})">✏ Notes</button>
-      </div>`;
+    if (!hasActivity && t < currentTurn) continue; // hide empty past turns
+
+    html += `<div style="display:flex;gap:0;margin-bottom:16px">
+      <!-- Turn spine -->
+      <div style="display:flex;flex-direction:column;align-items:center;margin-right:14px;padding-top:2px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${hasActivity?'var(--accent)':'var(--border)'};flex-shrink:0;margin-top:3px"></div>
+        <div style="width:1px;flex:1;background:var(--border);margin-top:4px"></div>
+      </div>
+      <!-- Turn content -->
+      <div style="flex:1;min-width:0;padding-bottom:4px">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px">
+          <span style="font-family:'Cinzel',serif;font-size:0.95rem;color:var(--text)">${t === currentTurn ? `Turn ${t} <span style="font-size:0.72rem;color:var(--accent)">(current)</span>` : `Turn ${t}`}</span>
+          <button class="btn btn-ghost" style="font-size:0.72rem;padding:2px 8px;margin-left:auto" onclick="openTurnNote(${t})">✏ ${noteText ? 'Edit Note' : 'Add Note'}</button>
+        </div>`;
 
     if (noteText) {
-      html += `<div style="background:var(--surface1);border-left:3px solid var(--accent);padding:8px 12px;border-radius:4px;font-size:0.85rem;margin-bottom:10px;white-space:pre-wrap">${noteText}</div>`;
+      html += `<div style="background:var(--surface);border-left:2px solid var(--accent);padding:8px 12px;border-radius:0 4px 4px 0;font-size:0.83rem;margin-bottom:10px;white-space:pre-wrap;color:var(--text-muted)">${noteText}</div>`;
     }
 
     if (dispatches.length) {
-      html += `<div class="section-label" style="margin-top:0;margin-bottom:6px">Dispatches (${dispatches.length})</div>`;
+      html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin-bottom:6px">Dispatches</div>`;
       for (const e of dispatches) {
         const rp = players[e.reporter] || {};
         const flag = FACTION_FLAG[rp.faction] || '';
         const oppNames = (e.opponents || []).map(oid => {
           const op = players[oid]; return op ? `${FACTION_FLAG[op.faction]||''} ${op.officerName||op.name}` : oid;
         }).join(', ');
-        html += `<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.82rem">
-          <span style="font-weight:600">${flag} ${rp.officerName || e.reporter || '—'}</span>
-          ${oppNames ? `<span style="color:var(--text-muted)"> vs ${oppNames}</span>` : ''}
-          ${e.location ? `<span style="color:var(--text-muted);margin-left:6px">· ${e.location}</span>` : ''}
+        html += `<div style="background:var(--surface);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:0.82rem;border:1px solid var(--border)">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600">${flag} ${rp.officerName || rp.name || e.reporter || '—'}</span>
+            ${oppNames ? `<span style="color:var(--text-muted);font-size:0.78rem">vs ${oppNames}</span>` : ''}
+            ${e.location ? `<span style="color:var(--text-muted);font-size:0.78rem;margin-left:auto">📍 ${e.location}</span>` : ''}
+          </div>
+          ${e.letter ? `<div style="margin-top:6px;font-size:0.78rem;color:var(--text-muted);font-style:italic;border-top:1px solid var(--border);padding-top:6px;line-height:1.5">${e.letter.substring(0,180)}${e.letter.length>180?'…':''}</div>` : ''}
         </div>`;
       }
     }
 
-    if (repairsDone.length) {
-      html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Returned from Repair</div>`;
-      for (const s of repairsDone) {
-        const p = players[s.player] || {};
-        html += `<div style="font-size:0.82rem;padding:3px 0">⚓ <strong>${s.name}</strong> <span style="color:var(--text-muted)">(${p.name||s.player})</span></div>`;
-      }
-    }
-
-    // Ship events this turn — sunk, captured, sold, lost
-    const shipEvents = Object.values(ships).filter(s => s.lostAtTurn === t);
-    if (shipEvents.length) {
-      html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Ship Events</div>`;
-      for (const s of shipEvents) {
-        const owner = players[s.player] || {};
-        let icon = '💥', desc = '';
-        if (s.status === 'sunk') {
-          icon = '💥';
-          if (s.sunkBy === '__accident__') desc = 'Lost — accident';
-          else if (s.sunkBy === '__lost_on_passage__') desc = 'Lost on passage';
-          else {
-            const sinker = ships[s.sunkBy];
-            desc = `Sunk${sinker ? ` by ${sinker.name}` : ''}`;
-          }
-        } else if (s.status === 'lost') {
-          icon = '⚔';
-          const captor = ships[s.capturedBy];
-          desc = `Captured${captor ? ` by ${captor.name}` : ''}`;
-        } else if (s.status === 'sold') {
-          icon = '💰';
-          desc = 'Sold';
-        }
-        html += `<div style="font-size:0.82rem;padding:3px 0">${icon} <strong>${s.name}</strong> <span style="color:var(--text-muted)">(${owner.name||s.player})</span> — ${desc}</div>`;
-      }
-    }
-
-    // Officer events this turn
-    const officerEventTypes = ['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned','promotion'];
-    const officerEvents = Object.values(appData.log||{}).filter(l => l.turn === t && officerEventTypes.includes(l.type));
     if (officerEvents.length) {
-      html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Officer &amp; Campaign Events</div>`;
-      const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧', promotion:'🎖' };
-      for (const e of officerEvents) {
-        html += `<div style="font-size:0.82rem;padding:3px 0">${evIcons[e.type]||'•'} ${e.text||''}</div>`;
-      }
-    }
-
-    const interceptions = ((appData.meta || {}).interceptionLog || {})[t] || [];
-    if (interceptions.length) {
-      html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Interception Checks (${interceptions.length})</div>`;
-      for (const r of interceptions) {
-        const col = r.intercepts ? 'var(--accent)' : 'var(--text-muted)';
-        const modNote = r.mod !== 0 ? ` (${r.mod>=0?'+':''}${r.mod} → ${r.total})` : '';
-        html += `<div style="font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center">
-          <span style="color:var(--text-muted);min-width:55px">${r.zone}</span>
-          <span>${r.seekerName} vs ${r.targetName}</span>
-          <span style="margin-left:auto;white-space:nowrap"><strong style="color:${col}">${r.d1}+${r.d2}=${r.raw}${modNote} — ${r.intercepts?'⚔ BATTLE':'✗ Miss'}</strong></span>
+      html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${dispatches.length?'10px':0} 0 6px">Campaign Events</div>`;
+      html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
+      officerEvents.forEach((e, i) => {
+        html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 12px;${i>0?'border-top:1px solid var(--border)':''}">
+          <span style="font-size:1rem;flex-shrink:0;line-height:1.3">${evIcons[e.type]||'•'}</span>
+          <span style="font-size:0.82rem;line-height:1.4">${e.text||''}</span>
         </div>`;
-      }
+      });
+      html += `</div>`;
     }
 
-    if (!dispatches.length && !repairsDone.length && !interceptions.length && !noteText && !officerEvents.length) {
-      html += `<div style="font-size:0.8rem;color:var(--text-muted);font-style:italic">No activity recorded.</div>`;
+    const fleetEvents = [...repairsDone.map(s => {
+      const p = players[s.player] || {};
+      return { icon:'⚓', text:`<strong>${s.name}</strong> returned from repairs <span style="color:var(--text-muted)">(${p.name||s.player})</span>` };
+    }), ...shipEvents.map(s => {
+      const owner = players[s.player] || {};
+      let icon = '💥', desc = '';
+      if (s.status === 'sunk') {
+        if (s.sunkBy === '__accident__') desc = 'lost to accident';
+        else if (s.sunkBy === '__lost_on_passage__') desc = 'lost on passage';
+        else { const sinker = ships[s.sunkBy]; desc = `sunk${sinker?` by <strong>${sinker.name}</strong>`:'`'}`; }
+      } else if (s.status === 'lost') {
+        icon = '⚔'; const captor = ships[s.capturedBy]; desc = `captured${captor?` by <strong>${captor.name}</strong>`:''}`;
+      } else if (s.status === 'sold') { icon = '💰'; desc = 'sold'; }
+      return { icon, text:`<strong>${s.name}</strong> ${desc} <span style="color:var(--text-muted)">(${owner.name||s.player})</span>` };
+    })];
+
+    if (fleetEvents.length) {
+      const gap = dispatches.length || officerEvents.length ? '10px' : '0';
+      html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${gap} 0 6px">Fleet Events</div>`;
+      html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
+      fleetEvents.forEach((ev, i) => {
+        html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 12px;${i>0?'border-top:1px solid var(--border)':''}">
+          <span style="flex-shrink:0;line-height:1.3">${ev.icon}</span>
+          <span style="font-size:0.82rem;line-height:1.4">${ev.text}</span>
+        </div>`;
+      });
+      html += `</div>`;
     }
 
-    html += `</div>`;
+    if (interceptions.length) {
+      const gap = dispatches.length || officerEvents.length || fleetEvents.length ? '10px' : '0';
+      html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${gap} 0 6px">Interception Checks</div>`;
+      html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
+      interceptions.forEach((r, i) => {
+        const col = r.intercepts ? 'var(--accent)' : 'var(--text-muted)';
+        const modNote = r.mod !== 0 ? ` (+${r.mod}→${r.total})` : '';
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 12px;font-size:0.8rem;${i>0?'border-top:1px solid var(--border)':''}">
+          <span style="color:var(--text-muted);min-width:52px;flex-shrink:0">${r.zone}</span>
+          <span style="flex:1">${r.seekerName} vs ${r.targetName}</span>
+          <span style="white-space:nowrap;font-weight:600;color:${col}">${r.d1}+${r.d2}=${r.raw}${modNote} — ${r.intercepts?'⚔ Battle':'Miss'}</span>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    if (!hasActivity) {
+      html += `<div style="font-size:0.8rem;color:var(--text-muted);font-style:italic">No activity this turn.</div>`;
+    }
+
+    html += `</div></div>`; // close content + flex row
   }
 
   return html;
