@@ -758,8 +758,8 @@ window.adjustTurn = async function(delta) {
           multiUpdate[`/players/${s.player}/resources`] = Math.max(0, curRes - cost);
         }
       }
-      const logKey = `repair_assigned_${id}_${Date.now()}`;
-      multiUpdate[`/log/${logKey}`] = {
+      const repairLogKey = `repair_assigned_${id}_${Date.now()}`;
+      multiUpdate[`/log/${repairLogKey}`] = {
         type: 'repair_assigned', turn: newVal, timestamp: new Date().toISOString(),
         shipName: s.name, port, cost,
         text: `${s.name} assigned to ${port} for repairs (${cost} resources${totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready same turn'}).`,
@@ -2329,9 +2329,10 @@ function renderHistory() {
   const turns = [];
   for (let t = currentTurn; t >= 1; t--) turns.push(t);
 
-  // Index dispatches by turn
+  // Index dispatches by turn — player-created entries only
   const dispatchByTurn = {};
   for (const [id, e] of Object.entries(log)) {
+    if (e.type !== 'dispatch') continue;
     const t = e.turn || 1;
     if (!dispatchByTurn[t]) dispatchByTurn[t] = [];
     dispatchByTurn[t].push({id, ...e});
@@ -2420,11 +2421,11 @@ function renderHistory() {
     }
 
     // Officer events this turn
-    const officerEventTypes = ['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned'];
+    const officerEventTypes = ['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned','promotion'];
     const officerEvents = Object.values(appData.log||{}).filter(l => l.turn === t && officerEventTypes.includes(l.type));
     if (officerEvents.length) {
       html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Officer &amp; Campaign Events</div>`;
-      const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧' };
+      const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧', promotion:'🎖' };
       for (const e of officerEvents) {
         html += `<div style="font-size:0.82rem;padding:3px 0">${evIcons[e.type]||'•'} ${e.text||''}</div>`;
       }
@@ -3642,7 +3643,7 @@ window.promoteOfficer = async function(pid) {
       type: 'promotion',
       turn,
       timestamp: new Date().toISOString(),
-      reporter: pid,
+      playerId: pid,
       text: `${p.officerName || p.name} promoted to ${seniorRank}.`,
     },
   });
