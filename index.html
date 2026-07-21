@@ -644,17 +644,15 @@ function renderOverview() {
     <div class="stat-row" style="align-items:center">
       <span class="stat-label">Turn</span>
       <span class="stat-value" style="display:flex;align-items:center;gap:8px">
-        <button class="res-adj" onclick="adjustTurn(-1)" title="Previous turn">−</button>
         <strong style="font-size:1.15rem;color:var(--accent);min-width:24px;text-align:center">${turn}</strong>
-        <button class="res-adj" onclick="confirmAdvanceTurn()" title="Advance turn">+</button>
+        <button class="btn btn-sm" onclick="confirmAdvanceTurn()" style="padding:3px 10px;font-size:0.78rem">Advance Turn</button>
       </span>
     </div>
     <div class="stat-row" style="align-items:center">
       <span class="stat-label">Phase</span>
       <span class="stat-value" style="display:flex;align-items:center;gap:8px">
-        <button class="res-adj" onclick="adjustPhase(-1)" title="Previous phase">−</button>
         <strong style="min-width:24px;text-align:center">${phaseLabel(phase)}</strong>
-        <button class="res-adj" onclick="adjustPhase(1)" title="Next phase">+</button>
+        ${phase < 3 ? `<button class="btn btn-sm" onclick="adjustPhase(1)" style="padding:3px 10px;font-size:0.78rem">Advance Phase</button>` : ''}
       </span>
     </div>
   </div>`;
@@ -725,11 +723,6 @@ window.adjustTurn = async function(delta) {
   const current = appData.meta.turn || 1;
   const newVal = Math.max(1, current + delta);
   if (newVal === current) return;
-  if (delta > 0) {
-    if (!confirm(`Advance to Turn ${newVal}? This will reset movement confirmation and interception rolls.`)) return;
-  } else {
-    if (!confirm(`Go back to Turn ${newVal}? This cannot be undone.`)) return;
-  }
   const multiUpdate = { '/meta/turn': newVal };
 
   // On advance: complete repairs whose availableIn matches the new turn
@@ -818,6 +811,18 @@ window.adjustTurn = async function(delta) {
     }
   }
 
+  // Resource income on turn advance
+  if (delta > 0 && newVal >= 2) {
+    const income = newVal <= 3 ? 500 : 250;
+    const milPlayers = Object.entries(appData.players || {}).filter(([,p]) =>
+      p.faction && p.faction !== 'Merchant' && !MERCHANT_FACTIONS.includes(p.faction)
+    );
+    milPlayers.forEach(([pid, p]) => {
+      multiUpdate[`/players/${pid}/resources`] = (p.resources || 0) + income;
+    });
+    if (milPlayers.length) showToast(`Turn ${newVal}: each player received +${income} resources`);
+  }
+
   multiUpdate['/meta/movementDone']     = {};
   multiUpdate['/meta/interceptionUsed'] = {};
   await update(cref('/'), multiUpdate);
@@ -840,9 +845,11 @@ window.adjustTurn = async function(delta) {
   }
 };
 
-window.adjustPhase = async function(delta) {
-  const newVal = Math.min(3, Math.max(1, (appData.meta.phase || 1) + delta));
-  await update(cref('/meta'), { phase: newVal });
+window.adjustPhase = async function() {
+  const current = appData.meta.phase || 1;
+  if (current >= 3) return;
+  if (!confirm(`Advance to Phase ${current + 1}? This cannot be undone.`)) return;
+  await update(cref('/meta'), { phase: current + 1 });
 };
 
 function _showPhaseWarning(phase, conditions) {
@@ -888,7 +895,7 @@ function renderPlayer(pid) {
   const repairing = allPShips.filter(([,s]) => s.status === 'repairing');
   const pending   = allPShips.filter(([,s]) => s.status === 'captured' && !s.prizeResolution);
   const captured  = allPShips.filter(([,s]) => s.status === 'captured' && s.prizeResolution);
-  const sunk      = allPShips.filter(([,s]) => s.status === 'sunk');
+  const sunk      = allPShips.filter(([,s]) => s.status === 'sunk' || s.status === 'lost');
 
   const filters = ['all','active','repairing','pending','captured','sunk'];
   html += `<div class="filter-bar">
@@ -926,6 +933,7 @@ function renderPlayer(pid) {
     if (activeFilter === 'all') return true;
     if (activeFilter === 'pending') return s.status === 'captured' && !s.prizeResolution;
     if (activeFilter === 'captured') return s.status === 'captured' && s.prizeResolution;
+    if (activeFilter === 'sunk') return s.status === 'sunk' || s.status === 'lost';
     return s.status === activeFilter;
   });
 
@@ -966,7 +974,7 @@ function renderPlayer(pid) {
     html += `<div class="section-label" style="color:var(--green)">Captured from Enemy</div><div class="ship-list">${captured.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
   }
   if ((activeFilter === 'all' || activeFilter === 'sunk') && sunk.length) {
-    html += `<div class="section-label" style="color:var(--red)">Lost</div><div class="ship-list">${sunk.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
+    html += `<div class="section-label" style="color:var(--red)">Lost / Captured</div><div class="ship-list">${sunk.map(([id,s]) => shipCard(id,s)).join('')}</div>`;
   }
   if (!pShips.length) html += `<div class="empty-state">No ships to show.</div>`;
 
@@ -1026,7 +1034,7 @@ function renderFaction(faction) {
     // Group active ships by squadron
     const active = pShips.filter(([,s]) => s.status === 'active');
     const repairing = pShips.filter(([,s]) => s.status === 'repairing');
-    const lost = pShips.filter(([,s]) => s.status === 'sunk');
+    const lost = pShips.filter(([,s]) => s.status === 'sunk' || s.status === 'lost');
 
     if (active.length || (activeFilter === 'all' && active.length === 0 && repairing.length === 0)) {
       if (activeFilter === 'all' || activeFilter === 'active') {
@@ -1162,7 +1170,7 @@ function shipCard(id, s) {
     captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captor ? captor.name : s.capturedBy}</div>`;
   }
   // Show any ships this vessel has captured
-  const prizes = Object.entries(allShips).filter(([,ps]) => ps.capturedBy === id);
+  const prizes = Object.entries(allShips).filter(([,ps]) => ps.capturedBy === id && ps.status === 'lost');
   if (prizes.length) {
     captureLines += `<div class="ship-notes" style="color:var(--green)">🏆 Captured: ${prizes.map(([,ps]) => ps.name).join(', ')}</div>`;
   }
@@ -1241,8 +1249,7 @@ function shipCard(id, s) {
       return html;
     })()}
     ${captureLines}
-    ${s.previousName ? `<div class="ship-notes" style="color:var(--text-muted)">Formerly: ${s.previousName}</div>` : ''}
-    ${s.notes ? `<div class="ship-notes">${s.notes}</div>` : ''}
+    ${(s.previousName || s.notes) ? `<div class="ship-notes" style="color:var(--text-muted)">${[s.previousName ? `Formerly: ${s.previousName}` : '', s.notes || ''].filter(Boolean).join(' · ')}</div>` : ''}
     ${(() => {
       if (s.status !== 'captured' || s.prizeResolution) return '';
       // Only show prize UI if this ship is a prize on the capturing player's roster.
@@ -3435,45 +3442,71 @@ window.confirmAdvanceTurn = function() {
   const ships = appData.ships || {};
   const players = appData.players || {};
 
-  // Ships returning from repair on the next turn
-  const returning = Object.values(ships).filter(s =>
-    s.status === 'repairing' && s.availableIn === `Turn ${nextTurn}`
+  // Damaged active ships that haven't used jury rig and haven't been sent for repair
+  const damagedUnaddressed = Object.values(ships).filter(s =>
+    s.status === 'active' && s.player && s.player !== 'merchant' &&
+    (s.spCurrent < s.spMax || (s.structuralDamage && s.structuralDamage.length)) &&
+    s.juryRigTurn !== currentTurn && !s.pendingRepair && !s.pendingRepairAuth
   );
 
-  // Ships still in repair after advance
-  const stillRepairing = Object.values(ships).filter(s =>
-    s.status === 'repairing' && s.availableIn !== `Turn ${nextTurn}`
+  // Prizes not yet resolved
+  const unresolvedPrizes = Object.values(ships).filter(s =>
+    s.status === 'captured' && !s.prizeResolution
   );
 
-  let summaryHtml = `<p style="font-size:0.9rem;color:var(--text-muted);margin:0 0 14px">Advance from <strong>Turn ${currentTurn}</strong> to <strong>Turn ${nextTurn}</strong>?</p>`;
+  // Players with no officer assigned (vacant command)
+  const vacantCommand = Object.entries(players).filter(([, p]) =>
+    p.faction && p.faction !== 'Merchant' && !MERCHANT_FACTIONS.includes(p.faction) && !p.officerName
+  );
 
-  if (returning.length) {
-    summaryHtml += `<div class="section-label" style="margin-top:0;color:var(--green)">Returning from Repair (${returning.length})</div>`;
-    summaryHtml += returning.map(s => {
+  const row = (icon, text) =>
+    `<div style="display:flex;gap:8px;font-size:0.83rem;padding:4px 0;border-bottom:1px solid var(--border)">${icon} <span>${text}</span></div>`;
+
+  let reminders = '';
+
+  if (damagedUnaddressed.length) {
+    reminders += `<div class="section-label" style="margin-top:12px;color:#c8821e">⚠ Damaged Ships — No Action Taken</div>
+    <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;margin-bottom:4px">`;
+    reminders += damagedUnaddressed.map(s => {
       const p = players[s.player] || {};
-      return `<div style="font-size:0.85rem;padding:3px 0">⚓ <strong>${s.name}</strong> <span style="color:var(--text-muted)">${p.name||s.player} · ${s.repairPort||'port'} · restored to ${s.spMax} SP</span></div>`;
+      const dmg = s.spMax - s.spCurrent;
+      const struc = s.structuralDamage && s.structuralDamage.length ? ` · ${s.structuralDamage.length} structural` : '';
+      return row(`${FACTION_FLAG[p.faction]||''}`, `<strong>${s.name}</strong> <span style="color:var(--text-muted)">${p.name||''} · ${dmg} SP damage${struc} · jury rig unused</span>`);
     }).join('');
+    reminders += `</div>`;
   }
 
-  if (stillRepairing.length) {
-    summaryHtml += `<div class="section-label" style="margin-top:10px;color:var(--text-muted)">Still In Repair (${stillRepairing.length})</div>`;
-    summaryHtml += stillRepairing.map(s => {
-      const p = players[s.player] || {};
-      return `<div style="font-size:0.85rem;padding:3px 0;color:var(--text-muted)">🔧 ${s.name} <span style="font-size:0.78rem">${p.name||s.player} · available ${s.availableIn||'unknown'}</span></div>`;
+  if (unresolvedPrizes.length) {
+    reminders += `<div class="section-label" style="margin-top:12px;color:#c8821e">⚠ Unresolved Prizes</div>
+    <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;margin-bottom:4px">`;
+    reminders += unresolvedPrizes.map(s => {
+      const captor = s.capturedBy ? (ships[s.capturedBy] || {}) : {};
+      const captorPlayer = captor.player ? (players[captor.player] || {}) : {};
+      return row('⚔', `<strong>${s.name}</strong> <span style="color:var(--text-muted)">captured by ${FACTION_FLAG[captorPlayer.faction]||''} ${captor.name||'unknown'} — awaiting prize decision</span>`);
     }).join('');
+    reminders += `</div>`;
   }
 
-  if (!returning.length && !stillRepairing.length) {
-    summaryHtml += `<div style="font-size:0.85rem;color:var(--text-muted);font-style:italic;margin-bottom:8px">No ships in repair.</div>`;
+  if (vacantCommand.length) {
+    reminders += `<div class="section-label" style="margin-top:12px;color:#c8821e">⚠ Vacant Command</div>
+    <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;margin-bottom:4px">`;
+    reminders += vacantCommand.map(([, p]) =>
+      row(`${FACTION_FLAG[p.faction]||''}`, `<strong>${p.name}</strong> <span style="color:var(--text-muted)">no officer assigned</span>`)
+    ).join('');
+    reminders += `</div>`;
   }
 
-  summaryHtml += `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:4px">
-    Movement confirmations and interception rolls will be reset for Turn ${nextTurn}.
-  </div>`;
+  if (!reminders) {
+    reminders = `<div style="font-size:0.85rem;color:var(--green);padding:8px 0">✓ No outstanding actions.</div>`;
+  }
 
   showModal(`<button class="modal-close" onclick="closeModal()">×</button>
     <h2>Advance to Turn ${nextTurn}</h2>
-    ${summaryHtml}
+    <p style="font-size:0.9rem;color:var(--text-muted);margin:0 0 4px">Advance from <strong>Turn ${currentTurn}</strong> to <strong>Turn ${nextTurn}</strong>?</p>
+    ${reminders}
+    <div style="font-size:0.78rem;color:var(--text-muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:4px">
+      Movement confirmations and interception rolls will be reset for Turn ${nextTurn}.
+    </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
       <button class="btn" onclick="closeModal();adjustTurn(1)">Confirm — Advance Turn</button>
