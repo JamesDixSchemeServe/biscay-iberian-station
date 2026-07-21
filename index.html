@@ -736,6 +736,37 @@ window.adjustTurn = async function(delta) {
     });
     if (completing.length) showToast(`Turn ${newVal}: ${completing.length} ship(s) returned to active service`);
 
+    // Assign repair ports for ships sent for repair last turn
+    const pendingRepairs = Object.entries(ships).filter(([,s]) => s.pendingRepair === true);
+    pendingRepairs.forEach(([id, s]) => {
+      const port = _findRepairPort(s.faction, s.location);
+      if (!port) return;
+      const { cost, totalTurns } = _calcPortRepair(port, s.spCurrent, s.spMax, s.structuralDamage, s.location);
+      const availTurn = newVal + totalTurns;
+      multiUpdate[`/ships/${id}/status`]        = 'repairing';
+      multiUpdate[`/ships/${id}/repairPort`]    = port;
+      multiUpdate[`/ships/${id}/repairCostPaid`]= cost;
+      multiUpdate[`/ships/${id}/availableIn`]   = totalTurns > 0 ? `Turn ${availTurn}` : '';
+      multiUpdate[`/ships/${id}/location`]      = port;
+      multiUpdate[`/ships/${id}/pendingRepair`] = null;
+      multiUpdate[`/ships/${id}/squadron`]      = '';
+      // Deduct resources from player
+      if (s.player && s.player !== 'merchant') {
+        const pl = (appData.players || {})[s.player];
+        if (pl) {
+          const curRes = multiUpdate[`/players/${s.player}/resources`] ?? pl.resources ?? 0;
+          multiUpdate[`/players/${s.player}/resources`] = Math.max(0, curRes - cost);
+        }
+      }
+      const logKey = `repair_assigned_${id}_${Date.now()}`;
+      multiUpdate[`/log/${logKey}`] = {
+        type: 'repair_assigned', turn: newVal, timestamp: new Date().toISOString(),
+        shipName: s.name, port, cost,
+        text: `${s.name} assigned to ${port} for repairs (${cost} resources${totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready same turn'}).`,
+      };
+    });
+    if (pendingRepairs.length) showToast(`${pendingRepairs.length} ship${pendingRepairs.length > 1 ? 's' : ''} assigned to repair ports`);
+
     // Auto-move convoy one zone toward destination
     const convoy = appData.convoy || {};
     const originZone = PORT_ZONE[convoy.origin];
@@ -1225,6 +1256,24 @@ function shipCard(id, s) {
     })()}
     ${s.status === 'sold' ? `<div class="ship-notes" style="color:var(--text-muted)">💰 Sold for prize money (${s.cost} resources)</div>` : ''}
     ${s.status === 'sunk' && s.sunkBy === '__lost_on_passage__' ? `<div class="ship-notes" style="color:var(--text-muted)">🌊 Lost on passage</div>` : ''}
+    ${(() => {
+      if (s.status !== 'active' || !s.player || s.player === 'merchant') return '';
+      const currentTurn = (appData.meta || {}).turn || 1;
+      const juryUsed = s.juryRigTurn === currentTurn;
+      if (s.pendingRepair) {
+        return `<div style="font-size:0.78rem;color:#c8821e;padding:7px 12px 8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:6px">⏳ Awaiting repair port assignment at start of next turn</div>`;
+      }
+      return `<div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border)">
+        <button class="btn btn-sm" style="flex:1;background:rgba(200,130,30,0.12);color:#c8821e;border-color:#c8821e${juryUsed?';opacity:0.45;cursor:not-allowed':''}"
+          ${juryUsed ? 'disabled' : `onclick="juryRigRepair('${id}')"`}>
+          ⚓ Jury Rig${juryUsed ? ' (used)' : ''}
+        </button>
+        <button class="btn btn-sm" style="flex:1;background:rgba(200,130,30,0.12);color:#c8821e;border-color:#c8821e"
+          onclick="sendForRepair('${id}')">
+          🔧 Send for Repair
+        </button>
+      </div>`;
+    })()}
   </div>`;
 }
 
@@ -1612,17 +1661,21 @@ function getLocationZone(loc) {
   return m ? parseInt(m[1]) : null;
 }
 
-function getMovementDestinations(location) {
+function getMovementDestinations(location, faction) {
   const zone = getLocationZone(location);
   if (!zone) return [];
   const result = new Set();
-  const isPort = MAP_PORTS_STATIC.some(p => p.name === location);
-  // From port: can put to sea in same zone and adjacent zones
-  // From zone: can move to adjacent zones and enter ports in same/adjacent zone
   for (let z = zone - 1; z <= zone + 1; z++) {
     if (z < 1 || z > 7) continue;
     result.add(`Zone ${z}`);
-    MAP_PORTS_STATIC.filter(p => p.zone === z).forEach(p => result.add(p.name));
+    MAP_PORTS_STATIC.filter(p => {
+      if (p.zone !== z) return false;
+      if (!faction) return true;
+      const isFriendly = p.fac === faction;
+      if (isFriendly) return true;          // always enter friendly ports
+      if (!p.major) return true;            // always enter enemy secondary ports
+      return false;                         // block enemy major ports
+    }).forEach(p => result.add(p.name));
   }
   result.delete(location);
   return [...result].sort((a, b) => {
@@ -1826,7 +1879,7 @@ window.mapGroupClick = function(encodedKey) {
 
   showModal(`<button class="modal-close" onclick="closeModal()">×</button>
     <h2>${flag} ${displayName}${sqnLabel}</h2>
-    <div class="stat-row"><span class="stat-label">Location</span><span class="stat-value">${loc}</span></div>
+    <div class="stat-row"><span class="stat-label">Location</span><span class="stat-value">${loc}${PORT_ZONE[loc] !== undefined ? ` <span style="color:var(--text-muted);font-size:0.8rem">(${MAJOR_REPAIR_PORTS.has(loc) ? 'Major Port' : 'Secondary Port'})</span>` : ''}</span></div>
     ${escortLine}
     ${!isMerchant && p.officerName ? `<div class="stat-row"><span class="stat-label">Officer</span><span class="stat-value">${p.officerName}</span></div>` : ''}
     ${officers.length ? `<div class="stat-row"><span class="stat-label">Ship Officers</span><span class="stat-value">${officers.join(', ')}</span></div>` : ''}
@@ -1845,7 +1898,7 @@ window.openMoveSquadron = function(encodedKey) {
   const [loc, playerId, squadron] = decodeURIComponent(encodedKey).split('|||');
   const p = (appData.players || {})[playerId] || {};
   const sqnLabel = squadron ? ` Squadron ${squadron}` : '';
-  const dests = getMovementDestinations(loc);
+  const dests = getMovementDestinations(loc, p.faction);
   if (!dests.length) { showToast('No adjacent locations found'); return; }
   const btnHtml = dests.map(d => {
     const zone = getLocationZone(d);
@@ -2367,11 +2420,11 @@ function renderHistory() {
     }
 
     // Officer events this turn
-    const officerEventTypes = ['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost'];
+    const officerEventTypes = ['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned'];
     const officerEvents = Object.values(appData.log||{}).filter(l => l.turn === t && officerEventTypes.includes(l.type));
     if (officerEvents.length) {
       html += `<div class="section-label" style="margin-top:8px;margin-bottom:6px">Officer &amp; Campaign Events</div>`;
-      const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴' };
+      const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧' };
       for (const e of officerEvents) {
         html += `<div style="font-size:0.82rem;padding:3px 0">${evIcons[e.type]||'•'} ${e.text||''}</div>`;
       }
@@ -2493,11 +2546,14 @@ const MISSION_TYPES = [
     flavour: {
       default: ['A prized enemy vessel rides at anchor in the roads. The men are eager, the night is dark, and the tide serves. Boats away.',
                 'Under cover of darkness, the longboats are lowered in silence. The target lies at anchor, her watch half-asleep. Board her and bring her out.',
-                'The anchorage is lightly guarded and the night is moonless. A cutting-out party in the boats may carry off the prize before the alarm is raised.'],
+                'The harbour is guarded, but the night is dark and the tide serves. If the boats can reach her before the alarm is raised, she can be taken.'],
     },
-    deploy: (d) => d.edge ? `The Target Ship deploys at anchor within 6″ of ${d.anchorLabel || `the ${d.edge} coastline`}. The attacker deploys on any table edge. All other defending ships deploy at anchor at least 10″ from the Target Ship and may not be deployed between the Target Ship and the attacker's chosen table edge.` : `The Target Ship deploys at anchor in the centre of the table. The attacker deploys on any table edge. All other defending ships deploy at anchor at least 10″ from the Target Ship and may not be deployed between the Target Ship and the attacker's chosen table edge.`,
-    rules: BOATS_RULES + `<br><br><strong>Silent Approach</strong><br>Once any attacking ship or Boat Marker is within 10″ of the Target Ship, at the end of each attacker's turn both admirals make a Skill Check. The attacking admiral receives +2. If the attacker wins or the result is tied, the alarm has not been raised. If the defender wins, the alarm is raised. The alarm is also raised immediately if either player makes a Gunnery attack or an attacking ship or Boat Marker initiates a boarding action.<br><br>Before the alarm is raised, defending ships may not weigh anchor, move or initiate boarding actions, but may return fire if fired on, or defend themselves if boarded. Once the alarm has been raised, all defending ships may act normally from their next activation.`,
-    goal: { attacker: 'Row in by boat, board the nominated target vessel at anchor, and sail her clear of the table.', defender: 'Raise the alarm and drive off the raiders before the ship is taken.' },
+    deploy: (d, weather) => {
+      const approachCondition = (weather && ['Night Action','Heavy Fog','Hazy'].includes(weather.name)) ? (weather.name === 'Night Action' ? 'darkness' : 'fog') : 'darkness';
+      return `The Target Ship is a vessel undergoing repairs. It deploys at anchor within 6″ of the harbour. The attacker deploys all ships at anchor, touching a single table edge of their choice. All other defending ships deploy at anchor at least 10″ from the Target Ship and may not be deployed between the Target Ship and the attacker's chosen table edge.<br><br>After all ships have been deployed, place the attacking Boat Markers, representing the final approach through ${approachCondition}. Boat Markers may not be deployed within 6″ of any defending ship, Shore Battery or the Target Ship.`;
+    },
+    rules: BOATS_RULES + `<br><br><strong>The Alarm</strong><br>Once any attacking ship or Boat Marker is within 6″ of the Target Ship, at the end of each attacker's turn — before the alarm has been raised — both admirals make a Skill Check. The attacking admiral receives +2 to their roll.<ul><li><strong>Attacker wins or result is tied:</strong> The alarm has not been raised.</li><li><strong>Defender wins:</strong> The alarm is immediately raised.</li></ul>The alarm is also raised immediately if either player makes a Gunnery attack or an attacking Boat Marker initiates a boarding action.<br><br>Before the alarm has been raised, defending ships may not weigh anchor, move or initiate boarding actions, but may return fire if fired upon or defend themselves if boarded. Once the alarm has been raised, all ships may act normally from their next activation.<br><br><strong>Captured Ships</strong><br>Once the Target Ship has been successfully captured, it may not move until it has passed a Skill Check at the start of its activation. This represents the prize crew securing the ship, cutting the anchor cable where necessary and getting her under command. Once this Skill Check has been passed, the Target Ship may move normally for the remainder of the game.`,
+    goal: { attacker: 'Sail the captured Target Ship off your chosen table edge.', defender: 'Prevent the Target Ship from being captured or stop her leaving the table before the end of the game.' },
   },
   {
     id: 'dispatches',
@@ -2548,8 +2604,8 @@ const MISSION_TYPES = [
                  'The coast is obscured, the charts are wrong, and the enemy is somewhere close. Get in, observe, and get out.'],
       default:  ['A small squadron is detached to reconnoitre the anchorage. Get in, observe, and get out — the fleet is waiting on your report.'],
     },
-    deploy: () => 'Place Points of Interest markers on shore first. The attacker then chooses a table edge and deploys within 12″ of it. The defender deploys on the opposite table edge.',
-    rules: `<strong>Points of Interest</strong><br>Place D3+3 markers on shore to represent points of interest.<br><br>To investigate a Point of Interest, a friendly ship must move within 12″ of it and remain there until the start of its next activation. Once investigated, remove the Point of Interest.`,
+    deploy: () => 'The defender places Points of Interest markers on shore first. The attacker then chooses a table edge and deploys within 12″ of it. The defender deploys on the opposite table edge.',
+    rules: `<strong>Points of Interest</strong><br>The defender places D3+3 markers on shore to represent points of interest.<br><br>To investigate a Point of Interest, a friendly ship must move within 12″ of it and remain there until the start of its next activation. Once investigated, remove the Point of Interest.`,
     goal: { attacker: 'Investigate all Points of Interest and safely withdraw at least one investigating ship from the board.', defender: 'Prevent the enemy from closing the shore — drive them off before they complete their survey.' },
   },
   {
@@ -2566,8 +2622,8 @@ const MISSION_TYPES = [
                  'The haze offers a fleeting chance to close with the shore batteries before they can bring effective fire to bear. Make every shot count.'],
       default:  ['The garrison stores along the waterfront are to be destroyed. Bring the squadron in close and open fire.'],
     },
-    deploy: () => 'Place Objective Markers on shore first. The attacker then chooses a table edge and deploys within 12″ of it. The defender deploys on the opposite table edge.',
-    rules: `<strong>Shore Bombardment</strong><br>Place D3+1 Objective Markers on the shoreline to represent the targets of the bombardment. Each Objective Marker has 10 Structure Points.<br><br>Objective Markers may be targeted by Gunnery attacks as though they were stationary ships, but they may not move, evade, or return fire unless represented by a Shore Battery.<br><br>When an Objective Marker is reduced to 0 Structure Points, it is destroyed and removed.`,
+    deploy: () => 'The defender places Objective Markers on shore first. The attacker then chooses a table edge and deploys within 12″ of it. The defender deploys on the opposite table edge.',
+    rules: `<strong>Shore Bombardment</strong><br>The defender places D3+1 Objective Markers on the shoreline to represent the targets of the bombardment. Each Objective Marker has 10 Structure Points.<br><br>Objective Markers may be targeted by Gunnery attacks as though they were stationary ships, but they may not move, evade, or return fire unless represented by a Shore Battery.<br><br>When an Objective Marker is reduced to 0 Structure Points, it is destroyed and removed.`,
     goal: { attacker: 'Destroy the nominated shore targets using ships\' guns.', defender: 'Drive off the attacking squadron before the shore targets are destroyed.' },
   },
   {
@@ -2586,7 +2642,7 @@ const MISSION_TYPES = [
     },
     deploy: () => 'Raiding ship deploys at anchor at least 12″ from the objective with maximum boats in the water in base contact. Friendly ships deploy within 10″ of the raiding ship. The defending squadron deploys on the furthest table edge.',
     rules: BOATS_RULES + `<br><br><strong>Shore Raid</strong><br>Place an Objective Marker on the shoreline to represent the target of the raid. A boat carrying a landing party must land within 6″ of the Objective Marker and remain there. At the end of each of the attacker's turns, while a landing party is at the Objective Marker, make a Skill Check for the landing party, adding +1 to the roll for each previous Skill Check made during the current attempt.<br><br>• Success: The objective is destroyed. Remove the Objective Marker. The landing party may immediately return to its boat.<br>• Failure: The raid continues. Make another Skill Check at the end of the next attacker's turn.<br><br>A landing party forced to leave the Objective Marker before the objective is destroyed must begin the process again if it returns.`,
-    goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
+    goal: { attacker: 'Land boats, destroy nominated shore targets, and recover the boats. Boats lost = crew hit on that ship. If successful, the attacker gains 100 resources.', defender: 'Drive the landing party back to their boats before the objectives are destroyed.' },
   },
   {
     id: 'watering',
@@ -2649,6 +2705,7 @@ const DEPLOYMENT_OPTIONS = [
   { name: 'Estuary Mouth',         icon: '🌿', edge: 'East',  note: 'Coastline runs along the east table edge. A river estuary opens up. There are shallow waters within 6″ of either bank. The channel mouth is navigable.', cuttingOut: true, weight: 4, flavourNote: 'The estuary mouth is treacherous — the channel is navigable, but the banks are not.' },
   { name: 'Fishing Fleet',         icon: '🎣', edge: 'East',  note: 'Coastline runs along the east table edge. Place D3+1 small neutral vessels within 12″ of the coastline. They do not move or fight but will drift. Treat as wrecks if destroyed — they obstruct movement but cannot be boarded or captured.', cuttingOut: true, weight: 3, flavourNote: 'Neutral fishing vessels work the grounds ahead — an inconvenience at best, a hazard at worst.' },
   { name: 'Coastal Wreck',         icon: '⚓', edge: 'East',  note: 'Coastline runs along the east table edge. A wrecked hull lies grounded within 6″ of the coastline. Treat as a permanent obstruction. Place D3 Shoal Markers within 3″ of the wreck.', mayShoal: false, cuttingOut: true, weight: 3, flavourNote: 'The bones of an earlier casualty mark the shallows — a reminder of what this coast does to the careless.' },
+  { name: 'Small Harbour',         icon: '🏘', edge: 'East',  note: 'Coastline runs along the east table edge. A small harbour in the centre, guarded by 2 Shore Batteries (1H Gun, 10SP).', cuttingOut: true, weight: 5, flavourNote: 'The harbour mouth is narrow and well-covered. Any attack will be costly — if it can be forced at all.' },
   // Zone 1 — English Channel
   { name: 'French Channel Coast',  icon: '🏔', edge: 'South', note: 'Coastline runs along the south table edge.', mayShoal: true, zones: [1] },
   { name: 'English Channel Coast', icon: '🏔', edge: 'North', note: 'Coastline runs along the north table edge.', mayShoal: true, zones: [1] },
@@ -2704,17 +2761,22 @@ const PHASE_WEIGHTS = {
   3: { fleet_action: 28, commerce_raid: 10, cutting_out: 6,  dispatches: 8,  blockade_run: 18, reconnaissance: 8,  shore_bombardment: 16, shore_raid: 4,  watering: 4  },
 };
 
-function _pickMissionForZone(forceA, forceB, phase) {
+function _pickMissionForZone(forceA, forceB, phase, location) {
   const countA = forceA.length, countB = forceB.length;
   const hasMerchant = [...forceA, ...forceB].some(s => (appData.players||{})[s.player]?.faction === 'Merchant' || s.faction === 'Merchant');
   const phaseW = PHASE_WEIGHTS[phase] || PHASE_WEIGHTS[2];
+  // cutting_out only available at secondary ports (not open zones, not major ports)
+  const isSecondaryPort = location && !location.match(/^Zone\s*\d+$/i) && MAP_PORTS_STATIC.some(p => p.name === location && !p.major);
+  const secondaryPortMissions = new Set(['cutting_out', 'shore_bombardment', 'shore_raid']);
   const pool = MISSION_TYPES.map(m => {
+    if (isSecondaryPort && !secondaryPortMissions.has(m.id)) return null;
+    if (m.id === 'cutting_out' && !isSecondaryPort) return null;
     let w = phaseW[m.id] ?? m.weight;
     if (m.id === 'fleet_action' && (countA < 2 || countB < 2)) w = Math.min(w, 4);
     if (m.id === 'commerce_raid' && hasMerchant) w = Math.min(w + 10, 30);
     if (m.id === 'blockade_run' && Math.abs(countA - countB) >= 2) w += 6;
     return { ...m, weight: w };
-  });
+  }).filter(Boolean);
   return _weightedPick(pool);
 }
 
@@ -2722,37 +2784,53 @@ function renderOrders() {
   const ships   = appData.ships   || {};
   const players = appData.players || {};
 
-  // Group active ships by zone — port ships go into their zone
-  const byZone = {};
-  Object.values(ships).forEach(s => {
-    if (s.status === 'sunk' || s.status === 'lost' || s.status === 'repairing') return;
-    const loc = (s.location || '').trim();
-    const zoneMatch = loc.match(/Zone\s*(\d+)/i);
-    let zone;
-    if (zoneMatch) {
-      zone = `Zone ${zoneMatch[1]}`;
-    } else if (PORT_ZONE[loc]) {
-      zone = `Zone ${PORT_ZONE[loc]}`;
-    } else {
-      zone = loc || 'Unknown';
-    }
-    if (!byZone[zone]) byZone[zone] = [];
-    byZone[zone].push({ ...s, _displayLoc: loc });
-  });
-
   function _hasEnemies(arr) {
     const factions = [...new Set(arr.map(s => (players[s.player] || {}).faction || s.faction))].filter(f => f !== 'Merchant');
     return factions.some((f1, i) => factions.slice(i+1).some(f2 => !areAllied(f1, f2) && f1 !== f2));
   }
 
-  const allZones = Object.entries(byZone).sort(([a],[b]) => a.localeCompare(b));
+  // Separate active ships: port ships at secondary ports become their own location;
+  // all others (at sea or at major/friendly ports) fold into their zone.
+  const byLocation = {}; // key = port name or "Zone N"
+  const secondaryPortNames = new Set(MAP_PORTS_STATIC.filter(p => !p.major).map(p => p.name));
+
+  Object.values(ships).forEach(s => {
+    if (s.status === 'sunk' || s.status === 'lost') return;
+    const loc = (s.location || '').trim();
+    const zoneMatch = loc.match(/Zone\s*(\d+)/i);
+    let key;
+    if (zoneMatch) {
+      key = `Zone ${zoneMatch[1]}`;
+    } else if (secondaryPortNames.has(loc)) {
+      // secondary port — keep as its own location key (include repairing ships as Cutting Out targets)
+      key = loc;
+    } else if (PORT_ZONE[loc]) {
+      // major port or known port — fold into zone (skip repairing ships)
+      if (s.status === 'repairing') return;
+      key = `Zone ${PORT_ZONE[loc]}`;
+    } else {
+      if (s.status === 'repairing') return;
+      key = loc || 'Unknown';
+    }
+    if (!byLocation[key]) byLocation[key] = [];
+    byLocation[key].push({ ...s, _displayLoc: loc });
+  });
+
+  // Sort: zones numerically, then secondary ports alphabetically after their zone
+  const allLocations = Object.entries(byLocation).sort(([a],[b]) => {
+    const aZone = a.match(/^Zone\s*(\d+)$/i);
+    const bZone = b.match(/^Zone\s*(\d+)$/i);
+    if (aZone && bZone) return parseInt(aZone[1]) - parseInt(bZone[1]);
+    if (aZone) return -1;
+    if (bZone) return 1;
+    return a.localeCompare(b);
+  });
 
   let html = `<div class="section-header"><h2>⚓ Orders of Battle</h2></div>
-  <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Select a zone to generate a mission brief based on the forces present.</p>`;
+  <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Contested zones and ports are highlighted. Select one to generate a mission brief.</p>`;
 
-  // Zone overview
   html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:28px">`;
-  allZones.forEach(([zone, arr]) => {
+  allLocations.forEach(([loc, arr]) => {
     const factionGroups = {};
     arr.forEach(s => {
       const f = (players[s.player] || {}).faction || s.faction || 'Unknown';
@@ -2760,10 +2838,22 @@ function renderOrders() {
       factionGroups[f].push(s);
     });
     const contested = _hasEnemies(arr);
+    const isPort = secondaryPortNames.has(loc);
+    const portLabel = isPort ? ` <span style="font-size:0.72rem;color:var(--text-muted)">(Secondary Port)</span>` : '';
+    const contestedLabel = contested ? ` <span style="font-size:0.7rem;color:var(--accent)">(contested)</span>` : '';
     html += `<div style="background:var(--surface);border:1px solid ${contested?'var(--accent)':'var(--border)'};border-radius:8px;padding:14px">
-      <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${contested?'var(--accent)':'var(--text)'};margin-bottom:8px">${zone} ${contested?'<span style="font-size:0.7rem;color:var(--accent)">(contested)</span>':''}</div>
-      ${Object.entries(factionGroups).map(([f, ss]) => `<div style="font-size:0.8rem;color:var(--text-muted)">${FACTION_FLAG[f]||''} ${f}: ${ss.length} ship${ss.length!==1?'s':''}</div>`).join('')}
-      ${contested ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" data-zone="${zone.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.zone)">Generate Mission</button>` : ''}
+      <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${contested?'var(--accent)':'var(--text)'};margin-bottom:8px">${loc}${portLabel}${contestedLabel}</div>
+      ${Object.entries(factionGroups).map(([f, ss]) => {
+        const active = ss.filter(s => s.status !== 'repairing');
+        const repairing = ss.filter(s => s.status === 'repairing');
+        let line = `${FACTION_FLAG[f]||''} ${f}: `;
+        const parts = [];
+        if (active.length) parts.push(`${active.length} ship${active.length!==1?'s':''}`);
+        if (repairing.length) parts.push(`${repairing.length} under repair`);
+        return `<div style="font-size:0.8rem;color:var(--text-muted)">${line}${parts.join(', ')}</div>`;
+      }).join('')}
+      ${contested && isPort ? `<div style="font-size:0.72rem;color:#c8821e;margin-top:4px">⚔ Cutting Out available</div>` : ''}
+      ${contested ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" data-loc="${loc.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.loc)">Generate Mission</button>` : ''}
     </div>`;
   });
   html += `</div>`;
@@ -2792,16 +2882,25 @@ function _shipsBySquadron(ships) {
   `).join('');
 }
 
-window.generateMission = function(zone) {
+window.generateMission = function(location) {
   const ships   = appData.ships   || {};
   const players = appData.players || {};
 
+  const isPortLocation = location && !location.match(/^Zone\s*\d+$/i);
+  const secondaryPortNames = new Set(MAP_PORTS_STATIC.filter(p => !p.major).map(p => p.name));
+
   const zoneShips = Object.values(ships).filter(s => {
-    if (s.status === 'sunk' || s.status === 'lost' || s.status === 'repairing') return false;
+    if (s.status === 'sunk' || s.status === 'lost') return false;
+    // include repairing ships at secondary ports (they are Cutting Out targets)
+    if (s.status === 'repairing' && !isPortLocation) return false;
     const loc = (s.location||'').trim();
+    if (isPortLocation) {
+      return loc === location;
+    }
+    // zone match: at-sea ships in this zone, plus major-port ships in this zone
     const zoneMatch = loc.match(/Zone\s*(\d+)/i);
-    const shipZone = zoneMatch ? `Zone ${zoneMatch[1]}` : (PORT_ZONE[loc] ? `Zone ${PORT_ZONE[loc]}` : loc);
-    return shipZone === zone;
+    const shipZone = zoneMatch ? `Zone ${zoneMatch[1]}` : (secondaryPortNames.has(loc) ? null : (PORT_ZONE[loc] ? `Zone ${PORT_ZONE[loc]}` : loc));
+    return shipZone === location;
   });
 
   // Group by faction
@@ -2827,7 +2926,7 @@ window.generateMission = function(zone) {
   if (!factionA) { showToast('No enemy factions in this zone'); return; }
 
   const phase       = (appData.meta || {}).phase || 1;
-  const mission     = _pickMissionForZone(shipsA, shipsB, phase);
+  const mission     = _pickMissionForZone(shipsA, shipsB, phase, location);
   const merchantPool = mission.merchants
     ? mission.merchants.map(m => {
         let w = m.weight;
@@ -2838,7 +2937,7 @@ window.generateMission = function(zone) {
     : null;
   const merchant    = merchantPool ? _weightedPick(merchantPool) : null;
   const vessel      = mission.vessel || null;
-  const zoneNum     = parseInt((zone.match(/\d+/) || [])[0]);
+  const zoneNum     = parseInt((location.match(/\d+/) || [])[0]);
   const weatherPool = WEATHER_OPTIONS
     .filter(w => w.name !== 'Northerly Swell' || (zoneNum >= 2 && zoneNum <= 6))
     .filter(w => w.name !== 'Levanter'        || zoneNum === 7)
@@ -2869,7 +2968,9 @@ window.generateMission = function(zone) {
     : _weightedPick(WIND_DIRECTIONS);
   const shoreRequired = ['cutting_out','reconnaissance','shore_bombardment','shore_raid','watering'].includes(mission.id);
   const coastOrIslandRequired = mission.id === 'watering';
+  const isSecondaryPortMission = isPortLocation && MAP_PORTS_STATIC.some(p => p.name === location && !p.major);
   const deploymentPool = DEPLOYMENT_OPTIONS
+    .filter(d => isSecondaryPortMission ? d.name === 'Small Harbour' : d.name !== 'Small Harbour')
     .filter(d => !d.zones || d.zones.includes(zoneNum))
     .filter(d => !shoreRequired || d.edge)
     .filter(d => mission.id !== 'cutting_out' || d.cuttingOut)
@@ -2902,9 +3003,9 @@ window.generateMission = function(zone) {
         <span style="font-size:1.6rem">${mission.icon}</span>
         <div>
           <div style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--accent)">${mission.name}</div>
-          <div style="font-size:0.78rem;color:var(--text-muted)">${zone} · Turn ${(appData.meta||{}).turn||1}</div>
+          <div style="font-size:0.78rem;color:var(--text-muted)">${location} · Turn ${(appData.meta||{}).turn||1}</div>
         </div>
-        <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-zone="${zone.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.zone)">🎲 Regenerate</button>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-loc="${location.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.loc)">🎲 Regenerate</button>
       </div>
 
       <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}${deployment.flavourNote ? `<br><br>${deployment.flavourNote}` : ''}${['Drifting Fog','Heavy Fog','Hazy'].includes(effectiveWeather.name) && Math.random() < 0.4 ? '<br><br>"It was only for a moment. I thought I saw a shape."' : ''}${(() => { const pool = RANDOM_QUOTES.filter(q => !q.missions || q.missions.includes(mission.id)); const q = pool.length && Math.random() < 0.25 ? pool[Math.floor(Math.random()*pool.length)] : null; return q ? `<br><br>${q.text}` : ''; })()}</p>
@@ -2929,7 +3030,7 @@ window.generateMission = function(zone) {
       </div>
       <div style="background:var(--surface2);border-radius:6px;padding:12px;margin-bottom:14px">
         <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Deployment</div>
-        <div style="font-size:0.82rem;color:var(--text)">${mission.deploy(deployment)}</div>
+        <div style="font-size:0.82rem;color:var(--text)">${mission.deploy(deployment, weather)}</div>
       </div>
 
       ${vessel ? `
@@ -3715,6 +3816,41 @@ const PORT_ZONE = {
   Lisbon:6,
   'Cádiz':7, Gibraltar:7,
 };
+const MAJOR_REPAIR_PORTS = new Set(['Plymouth','Brest','Rochefort','Ferrol','Lisbon','Cádiz','Gibraltar']);
+
+function _findRepairPort(faction, location) {
+  const factionPorts = FACTION_PORTS[faction] || [];
+  if (!factionPorts.length) return null;
+  const locMatch = (location || '').match(/Zone\s*(\d+)/i);
+  const currentZone = locMatch ? parseInt(locMatch[1]) : (PORT_ZONE[location] || 4);
+  const byZone = {};
+  factionPorts.forEach(p => {
+    const z = PORT_ZONE[p];
+    if (z !== undefined) { if (!byZone[z]) byZone[z] = []; byZone[z].push(p); }
+  });
+  let best = null, minDist = Infinity;
+  Object.entries(byZone).forEach(([z, ports]) => {
+    const dist = Math.abs(parseInt(z) - currentZone);
+    if (dist < minDist) { minDist = dist; best = ports; }
+  });
+  if (!best || !best.length) return null;
+  return best[Math.floor(Math.random() * best.length)];
+}
+
+function _calcPortRepair(port, spCurrent, spMax, structuralDamage, shipLocation) {
+  const isMajor = MAJOR_REPAIR_PORTS.has(port);
+  const damaged = Math.max(0, spMax - spCurrent);
+  const costPerSP = isMajor ? 1 : 2;
+  const structArr = structuralDamage || [];
+  const cost = damaged * costPerSP + (isMajor ? structArr.length * 10 : 0);
+  const spPct = spMax > 0 ? damaged / spMax : 0;
+  const repairTurns = isMajor ? (spPct >= 0.5 ? 2 : spPct >= 0.25 ? 1 : 0) : (spPct >= 0.5 ? 2 : 1);
+  const locMatch = (shipLocation || '').match(/Zone\s*(\d+)/i);
+  const shipZone = locMatch ? parseInt(locMatch[1]) : (PORT_ZONE[shipLocation] || null);
+  const portZone = PORT_ZONE[port] || null;
+  const travelTurns = (shipZone && portZone && Math.abs(shipZone - portZone) > 1) ? 1 : 0;
+  return { cost, totalTurns: repairTurns + travelTurns };
+}
 
 function shipFormHtml(s) {
   const players = Object.entries(appData.players || {});
@@ -3794,8 +3930,14 @@ function shipFormHtml(s) {
     </div>
     <div class="form-row"><label>Battles Without Striking</label><input type="number" id="sf-battles" value="${s.battlesWithoutStriking||0}" min="0"></div>
     <div class="form-row"><label>Officer Assigned</label><select id="sf-officer">${officerOpts}</select></div>
+    ${s.status === 'repairing' ? `
     <div class="form-row"><label>Repair Port</label><select id="sf-repairPort" onchange="recalcRepairCost()">${repairPortOpts}</select></div>
     <div id="repair-cost-breakdown" style="font-size:0.78rem;color:var(--text-muted);margin:-4px 0 8px;padding:6px 8px;background:var(--surface2);border-radius:4px;display:none"></div>
+    ` : `
+    <input type="hidden" id="sf-repairPort" value="${s.repairPort||''}">
+    <div id="repair-cost-breakdown" style="display:none"></div>
+    ${s.pendingRepair ? `<div style="font-size:0.78rem;color:#c8821e;padding:6px 8px;background:rgba(200,130,30,0.08);border-radius:4px;margin-bottom:8px">⏳ Repair pending — port will be assigned at the start of the next turn.</div>` : ''}
+    `}
     <div class="form-row" style="align-items:center">
       <label>Repair Cost
         <button type="button" id="sf-repairCost-lock" onclick="toggleRepairLock('repairCost')" title="Override auto-calculation" style="margin-left:6px;padding:1px 6px;font-size:0.7rem;border:1px solid var(--border);border-radius:3px;background:var(--surface2);color:var(--text-muted);cursor:pointer;vertical-align:middle">🔒 auto</button>
@@ -4080,6 +4222,14 @@ window.onShipStatusChange = function() {
   } else {
     section.style.display = 'none';
   }
+};
+
+window.sendForRepair = async function(id) {
+  const s = (appData.ships || {})[id];
+  if (!s) return;
+  if (!confirm(`Send ${s.name} for repairs?\n\nA repair port will be assigned at the start of the next turn based on the nearest friendly port to the ship's current location. Repair costs will be deducted automatically.`)) return;
+  await update(cref(`/ships/${id}`), { pendingRepair: true, squadron: '' });
+  showToast(`${s.name} — repair pending, port assigned next turn`);
 };
 
 window.juryRigRepair = async function(id) {
