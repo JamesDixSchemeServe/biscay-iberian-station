@@ -35,8 +35,11 @@
   .turn-badge span { color: var(--accent); font-weight: bold; }
 
   /* Nav tabs */
-  nav { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; gap: 2px; padding: 0 8px; }
-  nav button { background: none; border: none; color: var(--text-muted); padding: 10px 14px; font-family: var(--font); font-size: 0.85rem; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; transition: all 0.2s; }
+  nav { display: flex; flex-direction: column; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .nav-row { display: flex; align-items: center; overflow-x: auto; gap: 2px; padding: 0 8px; }
+  .nav-row + .nav-row { border-top: 1px solid var(--border); }
+  .nav-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); padding: 0 10px 0 4px; opacity: 0.6; white-space: nowrap; border-right: 1px solid var(--border); margin-right: 4px; }
+  nav button { background: none; border: none; color: var(--text-muted); padding: 8px 14px; font-family: var(--font); font-size: 0.85rem; cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; transition: all 0.2s; }
   nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
   nav button:hover:not(.active):not(.disabled) { color: var(--text); }
   nav button.disabled { opacity: 0.45; cursor: not-allowed; }
@@ -604,24 +607,30 @@ function rebuildNav() {
     const active = currentTab === pid ? ' active' : '';
     return `<button class="${active}" onclick="showTab('${pid}')">${flag} ${p.name}</button>`;
   }).join('');
+  const interceptionBtn = (() => {
+    const moveDone = (appData.meta || {}).movementDone || {};
+    const milPlayers = Object.entries(appData.players || {}).filter(([,p]) => p.faction && !MERCHANT_FACTIONS.includes(p.faction) && p.faction !== 'Merchant');
+    const allConfirmed = milPlayers.length > 0 && milPlayers.every(([pid]) => moveDone[pid]);
+    const cls = currentTab==='interception' ? 'active' : allConfirmed ? '' : 'disabled';
+    const pending = milPlayers.filter(([pid]) => !moveDone[pid]).map(([,p]) => p.name).join(', ');
+    return `<button class="${cls}" onclick="${allConfirmed?`showTab('interception')`:`showToast('Movement not confirmed: '+${JSON.stringify(pending)})`}">⚔ Interception</button>`;
+  })();
   nav.innerHTML = `
-    <button class="${currentTab==='overview'?'active':''}" onclick="showTab('overview')">Overview</button>
-    ${playerBtns}
-    <button class="${currentTab==='merchant'?'active':''}" onclick="showTab('merchant')">Merchant Convoy</button>
-    <button class="${currentTab==='log'?'active':''}" onclick="showTab('log')">Dispatches</button>
-    <button class="${currentTab==='map'?'active':''}" onclick="showTab('map')">Map</button>
-    ${(() => {
-      const moveDone = (appData.meta || {}).movementDone || {};
-      const players = appData.players || {};
-      const milPlayers = Object.entries(players).filter(([,p]) => p.faction && !MERCHANT_FACTIONS.includes(p.faction) && p.faction !== 'Merchant');
-      const allConfirmed = milPlayers.length > 0 && milPlayers.every(([pid]) => moveDone[pid]);
-      const cls = currentTab==='interception' ? 'active' : allConfirmed ? '' : 'disabled';
-      const pending = milPlayers.filter(([pid]) => !moveDone[pid]).map(([,p]) => p.name).join(', ');
-      return `<button class="${cls}" onclick="${allConfirmed?`showTab('interception')`:`showToast('Movement not confirmed: '+${JSON.stringify(pending)})`}">⚔ Interception</button>`;
-    })()}
-    <button class="${currentTab==='orders'?'active':''}" onclick="showTab('orders')">⚓ Orders</button>
-    <button class="${currentTab==='history'?'active':''}" onclick="showTab('history')">📜 History</button>
-    <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>
+    <div class="nav-row">
+      <span class="nav-label">Campaign</span>
+      <button class="${currentTab==='overview'?'active':''}" onclick="showTab('overview')">Overview</button>
+      <button class="${currentTab==='map'?'active':''}" onclick="showTab('map')">Map</button>
+      ${interceptionBtn}
+      <button class="${currentTab==='orders'?'active':''}" onclick="showTab('orders')">⚓ Orders</button>
+      <button class="${currentTab==='log'?'active':''}" onclick="showTab('log')">Dispatches</button>
+      <button class="${currentTab==='history'?'active':''}" onclick="showTab('history')">📜 History</button>
+      <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>
+    </div>
+    <div class="nav-row">
+      <span class="nav-label">Fleets</span>
+      ${playerBtns}
+      <button class="${currentTab==='merchant'?'active':''}" onclick="showTab('merchant')">Merchant Convoy</button>
+    </div>
   `;
 }
 
@@ -893,7 +902,6 @@ function renderPlayer(pid) {
   </div>`;
 
   html += `<div class="ships-header">
-    <div></div>
     <button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button>
   </div>`;
 
@@ -1977,12 +1985,6 @@ window.moveSquadron = async function(encodedKey, destination) {
   showToast(`${groupIds.length} ship${groupIds.length>1?'s':''} moved to ${destination}`);
 };
 
-window.confirmMovement = async function(playerId) {
-  await update(cref('/meta/movementDone'), { [playerId]: true });
-  showToast('Movement confirmed');
-  renderCurrentTab();
-};
-
 window.toggleMovement = async function(playerId, checked) {
   await update(cref('/meta/movementDone'), { [playerId]: checked || null });
   showToast(checked ? 'Movement confirmed' : 'Movement confirmation removed');
@@ -2297,6 +2299,8 @@ window.rollInterception = function(zoneId) {
     zone, turn, d1, d2, raw, total, mod, intercepts,
     seekerName: seekEntry2 ? `${seekEntry2.playerName}${seekEntry2.squadron ? ` Sqn ${seekEntry2.squadron}` : ''}` : seekKey,
     targetName: tgtKey === '__merchant__' ? 'Merchant Convoy' : (tgtEntry2 ? `${tgtEntry2.playerName}${tgtEntry2.squadron ? ` Sqn ${tgtEntry2.squadron}` : ''}` : tgtKey),
+    seekerPlayerId: seekEntry2 ? seekEntry2.player : null,
+    targetPlayerId: tgtEntry2 ? tgtEntry2.player : null,
   };
   if (!appData.meta.interceptionLog) appData.meta.interceptionLog = {};
   // Firebase returns arrays as plain objects — normalise before push
@@ -2352,6 +2356,8 @@ window.chooseBattle = function(zoneId) {
     zone, turn, d1: 0, d2: 0, raw: 0, total: 0, mod: 0, intercepts: true, chosen: true,
     seekerName: seekEntry ? `${seekEntry.playerName}${seekEntry.squadron ? ` Sqn ${seekEntry.squadron}` : ''}` : seekKey,
     targetName: tgtKey === '__merchant__' ? 'Merchant Convoy' : (tgtEntry ? `${tgtEntry.playerName}${tgtEntry.squadron ? ` Sqn ${tgtEntry.squadron}` : ''}` : tgtKey),
+    seekerPlayerId: seekEntry ? seekEntry.player : null,
+    targetPlayerId: tgtEntry ? tgtEntry.player : null,
   };
   if (!appData.meta.interceptionLog) appData.meta.interceptionLog = {};
   const existingLog = appData.meta.interceptionLog[turn];
@@ -2455,8 +2461,17 @@ function renderHistory() {
       html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${dispatches.length?'10px':0} 0 6px">Campaign Events</div>`;
       html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
       officerEvents.forEach((e, i) => {
+        let playerId = e.playerId;
+        if (!playerId && e.shipId) playerId = (ships[e.shipId] || {}).player;
+        if (!playerId && e.shipName) {
+          const found = Object.entries(ships).find(([,s]) => s.name === e.shipName);
+          if (found) playerId = found[1].player;
+        }
+        const ep = players[playerId] || {};
+        const eflag = FACTION_FLAG[ep.faction] || '';
         html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 12px;${i>0?'border-top:1px solid var(--border)':''}">
           <span style="font-size:1rem;flex-shrink:0;line-height:1.3">${evIcons[e.type]||'•'}</span>
+          ${eflag ? `<span style="flex-shrink:0;line-height:1.4">${eflag}</span>` : ''}
           <span style="font-size:0.82rem;line-height:1.4">${e.text||''}</span>
         </div>`;
       });
@@ -2464,9 +2479,15 @@ function renderHistory() {
     }
 
     const fleetEvents = [...repairsDone.map(e => {
-      const p = players[e.playerId] || {};
+      let playerId = e.playerId;
+      if (!playerId && e.shipId) playerId = (ships[e.shipId] || {}).player;
+      if (!playerId && e.shipName) {
+        const found = Object.entries(ships).find(([,s]) => s.name === e.shipName);
+        if (found) playerId = found[1].player;
+      }
+      const p = players[playerId] || {};
       const flag = FACTION_FLAG[p.faction] || '';
-      return { icon:'⚓', player: e.playerId, flag, text:`<strong>${e.shipName}</strong> returned from repairs at ${e.port||'port'}` };
+      return { icon:'⚓', player: playerId, flag, text:`<strong>${e.shipName}</strong> returned from repairs at ${e.port||'port'}` };
     }), ...shipEvents.map(s => {
       const owner = players[s.player] || {};
       const flag = FACTION_FLAG[owner.faction || s.faction] || '';
@@ -2506,13 +2527,20 @@ function renderHistory() {
       html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${gap} 0 6px">Battles</div>`;
       html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
       battles.forEach((r, i) => {
+        const _flagForEntry = (pid, name) => {
+          let p = players[pid];
+          if (!p && name) p = Object.values(players).find(pl => name.startsWith(pl.name));
+          return p ? (FACTION_FLAG[p.faction] || '') : '';
+        };
+        const seekFlag = _flagForEntry(r.seekerPlayerId, r.seekerName);
+        const tgtFlag  = _flagForEntry(r.targetPlayerId, r.targetName);
         const label = r.chosen
           ? `<span style="font-size:0.75rem;color:var(--text-muted);font-style:italic">Battle chosen</span>`
           : `<span style="font-size:0.75rem;color:var(--accent)">Intercepted</span>`;
         html += `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;font-size:0.82rem;${i>0?'border-top:1px solid var(--border)':''}">
           <span style="color:var(--accent);flex-shrink:0">⚔</span>
           <span style="color:var(--text-muted);min-width:52px;flex-shrink:0">${r.zone}</span>
-          <span style="flex:1">${r.seekerName} vs ${r.targetName}</span>
+          <span style="flex:1">${seekFlag} ${r.seekerName} vs ${tgtFlag} ${r.targetName}</span>
           ${label}
         </div>`;
       });
@@ -3256,46 +3284,6 @@ function renderRules() {
   </div>`;
 }
 
-window.openCampaignModal = function() {
-  showModal(`
-    <button class="modal-close" onclick="closeModal()">×</button>
-    <h2>Campaign Management</h2>
-    <div style="margin-bottom:16px">
-      <div style="font-weight:600;margin-bottom:4px">Current Campaign</div>
-      <div style="font-size:0.88rem;color:var(--text-muted)">ID: <strong style="color:var(--text)">${campaignId}</strong></div>
-    </div>
-    <hr style="border-color:var(--border);margin:16px 0">
-    <div style="font-weight:600;margin-bottom:4px">Clone From Another Campaign</div>
-    <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px">Copy all data from another campaign into <strong>${campaignId}</strong>. This will overwrite all current data.</div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input id="clone-src-id" type="text" placeholder="Source campaign ID" style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:0.88rem">
-      <button class="btn" onclick="confirmClone()">Clone</button>
-    </div>
-    <div id="clone-status" style="font-size:0.8rem;color:var(--text-muted);margin-top:8px;min-height:1.2em"></div>
-    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
-  `);
-};
-
-window.confirmClone = async function() {
-  const src = (document.getElementById('clone-src-id').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-  const status = document.getElementById('clone-status');
-  if (!src) { status.textContent = 'Enter a source campaign ID.'; return; }
-  if (src === campaignId) { status.textContent = 'Source and destination are the same campaign.'; return; }
-  if (!confirm(`This will overwrite ALL data in "${campaignId}" with data from "${src}". This cannot be undone. Continue?`)) return;
-  status.textContent = 'Checking source campaign…';
-  try {
-    const srcSnap = await get(ref(db, `/campaigns/${src}`));
-    if (!srcSnap.exists()) { status.textContent = `No campaign found with ID "${src}".`; return; }
-    status.textContent = 'Copying data…';
-    await set(ref(db, `/campaigns/${campaignId}`), srcSnap.val());
-    status.style.color = 'var(--green)';
-    status.textContent = `Done — campaign cloned from "${src}". Reloading…`;
-    setTimeout(() => location.reload(), 1500);
-  } catch(e) {
-    status.style.color = 'var(--red)';
-    status.textContent = 'Error: ' + e.message;
-  }
-};
 
 function renderLog() {
   const log = appData.log || {};
