@@ -2826,37 +2826,53 @@ function renderOrders() {
     return a.localeCompare(b);
   });
 
-  let html = `<div class="section-header"><h2>⚓ Orders of Battle</h2></div>
-  <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px">Contested zones and ports are highlighted. Select one to generate a mission brief.</p>`;
+  const zoneLocations = allLocations.filter(([loc]) => !secondaryPortNames.has(loc));
+  const portLocations = allLocations.filter(([loc]) => secondaryPortNames.has(loc));
 
-  html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:28px">`;
-  allLocations.forEach(([loc, arr]) => {
+  function _renderLocationCard(loc, arr, isPort) {
     const factionGroups = {};
     arr.forEach(s => {
       const f = (players[s.player] || {}).faction || s.faction || 'Unknown';
       if (!factionGroups[f]) factionGroups[f] = [];
       factionGroups[f].push(s);
     });
-    const contested = _hasEnemies(arr);
-    const isPort = secondaryPortNames.has(loc);
-    const portLabel = isPort ? ` <span style="font-size:0.72rem;color:var(--text-muted)">(Secondary Port)</span>` : '';
-    const contestedLabel = contested ? ` <span style="font-size:0.7rem;color:var(--accent)">(contested)</span>` : '';
-    html += `<div style="background:var(--surface);border:1px solid ${contested?'var(--accent)':'var(--border)'};border-radius:8px;padding:14px">
-      <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${contested?'var(--accent)':'var(--text)'};margin-bottom:8px">${loc}${portLabel}${contestedLabel}</div>
+    const missionReady = _hasEnemies(arr);
+    const borderColor = missionReady ? 'var(--accent)' : 'var(--border)';
+    const titleColor  = missionReady ? 'var(--accent)' : 'var(--text)';
+    const missionLabel = isPort
+      ? (missionReady ? `<div style="font-size:0.72rem;color:#c8821e;margin-top:4px">⚔ Mission available</div>` : '')
+      : (missionReady ? ` <span style="font-size:0.7rem;color:var(--accent)">(contested)</span>` : '');
+    const titleSuffix = isPort ? `` : (missionReady ? missionLabel : '');
+    return `<div style="background:var(--surface);border:1px solid ${borderColor};border-radius:8px;padding:14px">
+      <div style="font-family:'Cinzel',serif;font-size:0.9rem;color:${titleColor};margin-bottom:8px">${loc}${titleSuffix}</div>
       ${Object.entries(factionGroups).map(([f, ss]) => {
         const active = ss.filter(s => s.status !== 'repairing');
         const repairing = ss.filter(s => s.status === 'repairing');
-        let line = `${FACTION_FLAG[f]||''} ${f}: `;
         const parts = [];
         if (active.length) parts.push(`${active.length} ship${active.length!==1?'s':''}`);
         if (repairing.length) parts.push(`${repairing.length} under repair`);
-        return `<div style="font-size:0.8rem;color:var(--text-muted)">${line}${parts.join(', ')}</div>`;
+        return `<div style="font-size:0.8rem;color:var(--text-muted)">${FACTION_FLAG[f]||''} ${f}: ${parts.join(', ')}</div>`;
       }).join('')}
-      ${contested && isPort ? `<div style="font-size:0.72rem;color:#c8821e;margin-top:4px">⚔ Cutting Out available</div>` : ''}
-      ${contested ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" data-loc="${loc.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.loc)">Generate Mission</button>` : ''}
+      ${isPort ? missionLabel : ''}
+      ${missionReady ? `<button class="btn btn-sm" style="margin-top:10px;width:100%" data-loc="${loc.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.loc)">Generate Mission</button>` : ''}
     </div>`;
-  });
-  html += `</div>`;
+  }
+
+  let html = `<div class="section-header"><h2>⚓ Orders of Battle</h2></div>`;
+
+  if (zoneLocations.length) {
+    html += `<h3 style="font-family:'Cinzel',serif;font-size:0.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 10px">Zones</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:28px">`;
+    zoneLocations.forEach(([loc, arr]) => { html += _renderLocationCard(loc, arr, false); });
+    html += `</div>`;
+  }
+
+  if (portLocations.length) {
+    html += `<h3 style="font-family:'Cinzel',serif;font-size:0.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin:0 0 10px">Secondary Ports</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:28px">`;
+    portLocations.forEach(([loc, arr]) => { html += _renderLocationCard(loc, arr, true); });
+    html += `</div>`;
+  }
 
   // Generated mission display area
   html += `<div id="mission-output"></div>`;
