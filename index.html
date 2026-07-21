@@ -740,17 +740,28 @@ window.adjustTurn = async function(delta) {
 
     // Assign repair ports for ships sent for repair last turn
     const pendingRepairs = Object.entries(ships).filter(([,s]) => s.pendingRepair === true);
+    let arrivedCount = 0;
     pendingRepairs.forEach(([id, s]) => {
       const port = _findRepairPort(s.faction, s.location);
-      if (!port) return;
-      const { cost, totalTurns } = _calcPortRepair(port, s.spCurrent, s.spMax, s.structuralDamage, s.location);
-      const availTurn = newVal + totalTurns;
-      multiUpdate[`/ships/${id}/location`]         = port;
-      multiUpdate[`/ships/${id}/pendingRepair`]    = null;
-      multiUpdate[`/ships/${id}/squadron`]         = '';
-      multiUpdate[`/ships/${id}/pendingRepairAuth`] = { port, cost, totalTurns };
+      if (!port) {
+        multiUpdate[`/ships/${id}/pendingRepairWarning`] = 'No friendly repair port found — move ship to a friendly port zone and try again';
+        return;
+      }
+      const { cost, repairTurns, travelTurns } = _calcPortRepair(port, s.spCurrent, s.spMax, s.structuralDamage, s.location);
+      if (travelTurns > 0) {
+        multiUpdate[`/ships/${id}/pendingRepairWarning`] = `No nearby friendly port — ${port} is too far. Move ship to Zone ${(PORT_ZONE[port] || '?')} or adjacent zone first`;
+        return;
+      }
+      arrivedCount++;
+      multiUpdate[`/ships/${id}/location`]          = port;
+      multiUpdate[`/ships/${id}/pendingRepair`]     = null;
+      multiUpdate[`/ships/${id}/pendingRepairWarning`] = null;
+      multiUpdate[`/ships/${id}/squadron`]          = '';
+      multiUpdate[`/ships/${id}/pendingRepairAuth`] = { port, cost, totalTurns: repairTurns };
     });
-    if (pendingRepairs.length) showToast(`${pendingRepairs.length} ship${pendingRepairs.length > 1 ? 's' : ''} arrived at repair port — authorisation required`);
+    if (arrivedCount) showToast(`${arrivedCount} ship${arrivedCount > 1 ? 's' : ''} arrived at repair port — authorisation required`);
+    const blockedCount = pendingRepairs.length - arrivedCount;
+    if (blockedCount) showToast(`${blockedCount} ship${blockedCount > 1 ? 's' : ''} too far from a friendly port — move closer first`);
 
     // Auto-move convoy one zone toward destination
     const convoy = appData.convoy || {};
@@ -881,14 +892,8 @@ function renderPlayer(pid) {
     }).join('')}
   </div>`;
 
-  const moveDone = !!((appData.meta||{}).movementDone||{})[pid];
   html += `<div class="ships-header">
-    <div style="display:flex;align-items:center;gap:8px">
-      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;color:${moveDone?'var(--green)':'var(--text-muted)'}">
-        <input type="checkbox" ${moveDone?'checked':''} onchange="toggleMovement('${pid}', this.checked)" style="width:15px;height:15px;cursor:pointer">
-        Movement confirmed
-      </label>
-    </div>
+    <div></div>
     <button class="btn btn-sm" onclick="openAddShip('${pid}','${p.faction}')">+ Add Ship</button>
   </div>`;
 
@@ -1242,8 +1247,17 @@ function shipCard(id, s) {
     ${s.status === 'sold' ? `<div class="ship-notes" style="color:var(--text-muted)">💰 Sold for prize money (${s.cost} resources)</div>` : ''}
     ${s.status === 'sunk' && s.sunkBy === '__lost_on_passage__' ? `<div class="ship-notes" style="color:var(--text-muted)">🌊 Lost on passage</div>` : ''}
     ${(() => {
-      if (s.status !== 'active' || !s.player || s.player === 'merchant') return '';
+      if ((!['active','repairing'].includes(s.status)) || !s.player || s.player === 'merchant') return '';
       const currentTurn = (appData.meta || {}).turn || 1;
+      // For repairing ships, only show repair state blocks — not the jury rig / send for repair buttons
+      if (s.status === 'repairing' && !s.pendingRepairAuth && !s.pendingRepair) {
+        const costPaid = s.repairCostPaid || 0;
+        const refundNote = costPaid > 0 ? ` (${costPaid} res refunded)` : '';
+        return `<div style="border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-size:0.78rem;color:var(--text-muted)">🔧 Repairing at ${s.repairPort||'port'} · ${s.availableIn||'unknown'}</span>
+          <button class="btn btn-sm" style="background:rgba(180,60,60,0.12);color:#c05050;border-color:#c05050" onclick="cancelRepair('${id}')">✕ Cancel${refundNote}</button>
+        </div>`;
+      }
       const needsRepair = s.spCurrent < s.spMax || (s.structuralDamage && s.structuralDamage.length > 0);
       if (s.pendingRepairAuth) {
         const pra = s.pendingRepairAuth;
@@ -1252,11 +1266,23 @@ function shipCard(id, s) {
         const turnsLine = pra.totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready immediately';
         return `<div style="border-top:1px solid var(--border);padding:8px 12px">
           <div style="font-size:0.78rem;color:#c8821e;margin-bottom:6px">🔧 Awaiting authorisation for repairs at <strong>${pra.port}</strong> — ${costLine}${turnsLine}</div>
-          <button class="btn btn-sm" style="background:rgba(200,130,30,0.18);color:#c8821e;border-color:#c8821e" onclick="authoriseRepair('${id}')">✅ Authorise Repairs</button>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" style="background:rgba(200,130,30,0.18);color:#c8821e;border-color:#c8821e" onclick="authoriseRepair('${id}')">✅ Authorise Repairs</button>
+            <button class="btn btn-sm" style="background:rgba(180,60,60,0.12);color:#c05050;border-color:#c05050" onclick="cancelRepair('${id}')">✕ Cancel</button>
+          </div>
         </div>`;
       }
       if (s.pendingRepair) {
-        return `<div style="font-size:0.78rem;color:#c8821e;padding:7px 12px 8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:6px">⏳ Awaiting repair port assignment at start of next turn</div>`;
+        if (s.pendingRepairWarning) {
+          return `<div style="border-top:1px solid var(--border);padding:8px 12px">
+            <div style="font-size:0.78rem;color:#c05050;margin-bottom:6px">⚠ ${s.pendingRepairWarning}</div>
+            <button class="btn btn-sm" style="background:rgba(180,60,60,0.12);color:#c05050;border-color:#c05050" onclick="cancelRepair('${id}')">✕ Cancel Repair</button>
+          </div>`;
+        }
+        return `<div style="border-top:1px solid var(--border);padding:7px 12px 8px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span style="font-size:0.78rem;color:#c8821e">⏳ Awaiting repair port assignment at start of next turn</span>
+          <button class="btn btn-sm" style="background:rgba(180,60,60,0.12);color:#c05050;border-color:#c05050" onclick="cancelRepair('${id}')">✕ Cancel</button>
+        </div>`;
       }
       if (!needsRepair) return '';
       const juryUsed = s.juryRigTurn === currentTurn;
@@ -1810,12 +1836,35 @@ function renderMap() {
     </div>`;
   }).join('');
 
+  const moveDone = (appData.meta || {}).movementDone || {};
+  const milPlayers = Object.entries(players).filter(([,p]) => p.faction && !MERCHANT_FACTIONS.includes(p.faction) && p.faction !== 'Merchant');
+  const allConfirmed = milPlayers.length > 0 && milPlayers.every(([pid]) => moveDone[pid]);
+  const movementStatusLines = milPlayers.map(([pid, p]) => {
+    const done = !!moveDone[pid];
+    return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span>${FACTION_FLAG[p.faction]||''} ${p.name}</span>
+      ${done
+        ? `<span style="color:var(--green);display:flex;align-items:center;gap:8px">✓ Confirmed
+            <button class="btn btn-sm" style="font-size:0.72rem;padding:2px 7px;opacity:0.7" onclick="toggleMovement('${pid}',false)">Undo</button>
+           </span>`
+        : `<button class="btn btn-sm" style="background:rgba(200,130,30,0.12);color:#c8821e;border-color:#c8821e" onclick="toggleMovement('${pid}',true)">Confirm Movement</button>`
+      }
+    </div>`;
+  }).join('');
+
   return `<div style="position:relative;max-width:663px;margin:0 auto;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#7aa8c0">
     <img src="MAP.jpg" style="width:100%;display:block;vertical-align:bottom"
          onerror="this.style.opacity='0.15'">
     ${bubbleHtml}
     <div style="position:absolute;bottom:6px;right:8px;display:flex;gap:6px;opacity:0.85">
       ${Object.entries(FC).map(([f,c])=>`<span style="background:${c};color:white;font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:10px;border:1px solid white">${f}</span>`).join('')}
+    </div>
+  </div>
+  <div style="max-width:663px;margin:12px auto 0;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface)">
+    <div class="section-label" style="margin-bottom:8px">Movement &amp; Interception</div>
+    ${movementStatusLines}
+    <div style="margin-top:6px;font-size:0.75rem;color:${allConfirmed ? 'var(--green)' : 'var(--text-muted)'}">
+      ${allConfirmed ? '✓ Movement confirmed — Interception tab is unlocked' : 'Interception tab unlocks when all players confirm movement'}
     </div>
   </div>`;
 }
@@ -3278,13 +3327,6 @@ window.openCampaignModal = function() {
   const turn    = meta.turn  || 1;
   const phase   = meta.phase || 1;
 
-  const moveDone = meta.movementDone || {};
-  const milPlayers = Object.entries(players).filter(([,p]) => p.faction && !MERCHANT_FACTIONS.includes(p.faction) && p.faction !== 'Merchant');
-  const allConfirmed = milPlayers.length > 0 && milPlayers.every(([pid]) => moveDone[pid]);
-  const movementStatusLines = milPlayers.map(([pid, p]) =>
-    `<div style="font-size:0.8rem;margin:2px 0">${FACTION_FLAG[p.faction]||''} ${p.name}: ${moveDone[pid] ? '<span style="color:var(--green)">✓ Confirmed</span>' : '<span style="color:var(--text-muted)">Pending…</span>'}</div>`
-  ).join('');
-
   const playerListHtml = Object.entries(players).map(([pid, p]) =>
     `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border)">
       <span>${FACTION_FLAG[p.faction]||''} <strong>${p.name}</strong> <span style="color:var(--text-muted)">${p.officerName||''} · ${p.faction}</span></span>
@@ -3294,16 +3336,6 @@ window.openCampaignModal = function() {
 
   showModal(`<button class="modal-close" onclick="closeModal()">×</button>
     <h2>⚙ Campaign Management</h2>
-
-    <div class="section-label" style="margin-top:20px">Movement &amp; Interception</div>
-    ${movementStatusLines}
-    <div style="margin-top:6px;font-size:0.75rem;color:${allConfirmed?'var(--green)':'var(--text-muted)'}">
-      ${allConfirmed ? '✓ Movement confirmed — Interception tab is unlocked' : 'Interception tab unlocks when all players confirm movement'}
-    </div>
-
-    <div class="section-label" style="margin-top:20px">Campaign History</div>
-    <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 8px">Turn-by-turn summary of dispatches, repairs, interception results and GM notes.</p>
-    <button class="btn btn-sm" onclick="openHistory()">📜 View History</button>
 
     <div class="section-label" style="margin-top:20px">Players</div>
     <div style="margin-bottom:10px">${playerListHtml}</div>
@@ -3934,7 +3966,7 @@ function _calcPortRepair(port, spCurrent, spMax, structuralDamage, shipLocation)
   const shipZone = locMatch ? parseInt(locMatch[1]) : (PORT_ZONE[shipLocation] || null);
   const portZone = PORT_ZONE[port] || null;
   const travelTurns = (shipZone && portZone && Math.abs(shipZone - portZone) > 1) ? 1 : 0;
-  return { cost, totalTurns: repairTurns + travelTurns };
+  return { cost, repairTurns, travelTurns, totalTurns: repairTurns + travelTurns };
 }
 
 function shipFormHtml(s) {
@@ -4313,7 +4345,7 @@ window.sendForRepair = async function(id) {
   const s = (appData.ships || {})[id];
   if (!s) return;
   if (!confirm(`Send ${s.name} for repairs?\n\nA repair port will be assigned at the start of the next turn. You will be asked to authorise costs before repairs begin.`)) return;
-  await update(cref(`/ships/${id}`), { pendingRepair: true, squadron: '' });
+  await update(cref(`/ships/${id}`), { pendingRepair: true, status: 'repairing', squadron: '' });
   showToast(`${s.name} — repair pending, port assigned next turn`);
 };
 
@@ -4348,6 +4380,29 @@ window.authoriseRepair = async function(id) {
   };
   await update(cref('/'), multiUpdate);
   showToast(`${s.name} — repairs authorised at ${pra.port}`);
+};
+
+window.cancelRepair = async function(id) {
+  const s = (appData.ships || {})[id];
+  if (!s) return;
+  const costPaid = s.repairCostPaid || 0;
+  const refundLine = costPaid > 0 ? `\n\n${costPaid} resources will be refunded.` : '';
+  if (!confirm(`Cancel repairs for ${s.name}?${refundLine}`)) return;
+  const updates = {
+    [`/ships/${id}/status`]:              'active',
+    [`/ships/${id}/pendingRepair`]:       null,
+    [`/ships/${id}/pendingRepairAuth`]:   null,
+    [`/ships/${id}/pendingRepairWarning`]: null,
+    [`/ships/${id}/repairPort`]:          '',
+    [`/ships/${id}/repairCostPaid`]:      0,
+    [`/ships/${id}/availableIn`]:         '',
+  };
+  if (costPaid > 0 && s.player && s.player !== 'merchant') {
+    const pl = (appData.players || {})[s.player];
+    if (pl) updates[`/players/${s.player}/resources`] = (pl.resources ?? 0) + costPaid;
+  }
+  await update(cref('/'), updates);
+  showToast(`${s.name} — repairs cancelled${costPaid > 0 ? `, ${costPaid} resources refunded` : ''}`);
 };
 
 window.juryRigRepair = async function(id) {
