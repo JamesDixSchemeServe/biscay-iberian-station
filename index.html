@@ -745,30 +745,12 @@ window.adjustTurn = async function(delta) {
       if (!port) return;
       const { cost, totalTurns } = _calcPortRepair(port, s.spCurrent, s.spMax, s.structuralDamage, s.location);
       const availTurn = newVal + totalTurns;
-      multiUpdate[`/ships/${id}/status`]        = 'repairing';
-      multiUpdate[`/ships/${id}/repairPort`]    = port;
-      multiUpdate[`/ships/${id}/repairCostPaid`]= cost;
-      multiUpdate[`/ships/${id}/availableIn`]   = totalTurns > 0 ? `Turn ${availTurn}` : '';
-      multiUpdate[`/ships/${id}/location`]      = port;
-      multiUpdate[`/ships/${id}/pendingRepair`] = null;
-      multiUpdate[`/ships/${id}/squadron`]      = '';
-      // Deduct resources from player
-      if (s.player && s.player !== 'merchant') {
-        const pl = (appData.players || {})[s.player];
-        if (pl) {
-          const curRes = multiUpdate[`/players/${s.player}/resources`] ?? pl.resources ?? 0;
-          multiUpdate[`/players/${s.player}/resources`] = Math.max(0, curRes - cost);
-        }
-      }
-      const repairLogKey = `repair_assigned_${id}_${Date.now()}`;
-      multiUpdate[`/log/${repairLogKey}`] = {
-        type: 'repair_assigned', turn: newVal, timestamp: new Date().toISOString(),
-        shipName: s.name, shipId: id, playerId: s.player, port, cost,
-        availableTurn: totalTurns > 0 ? availTurn : newVal,
-        text: `${s.name} assigned to ${port} for repairs (${cost} resources${totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready same turn'}).`,
-      };
+      multiUpdate[`/ships/${id}/location`]         = port;
+      multiUpdate[`/ships/${id}/pendingRepair`]    = null;
+      multiUpdate[`/ships/${id}/squadron`]         = '';
+      multiUpdate[`/ships/${id}/pendingRepairAuth`] = { port, cost, totalTurns };
     });
-    if (pendingRepairs.length) showToast(`${pendingRepairs.length} ship${pendingRepairs.length > 1 ? 's' : ''} assigned to repair ports`);
+    if (pendingRepairs.length) showToast(`${pendingRepairs.length} ship${pendingRepairs.length > 1 ? 's' : ''} arrived at repair port — authorisation required`);
 
     // Auto-move convoy one zone toward destination
     const convoy = appData.convoy || {};
@@ -1262,10 +1244,22 @@ function shipCard(id, s) {
     ${(() => {
       if (s.status !== 'active' || !s.player || s.player === 'merchant') return '';
       const currentTurn = (appData.meta || {}).turn || 1;
-      const juryUsed = s.juryRigTurn === currentTurn;
+      const needsRepair = s.spCurrent < s.spMax || (s.structuralDamage && s.structuralDamage.length > 0);
+      if (s.pendingRepairAuth) {
+        const pra = s.pendingRepairAuth;
+        const availTurn = currentTurn + pra.totalTurns;
+        const costLine = pra.cost > 0 ? `${pra.cost} resources` : 'no cost';
+        const turnsLine = pra.totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready immediately';
+        return `<div style="border-top:1px solid var(--border);padding:8px 12px">
+          <div style="font-size:0.78rem;color:#c8821e;margin-bottom:6px">🔧 Awaiting authorisation for repairs at <strong>${pra.port}</strong> — ${costLine}${turnsLine}</div>
+          <button class="btn btn-sm" style="background:rgba(200,130,30,0.18);color:#c8821e;border-color:#c8821e" onclick="authoriseRepair('${id}')">✅ Authorise Repairs</button>
+        </div>`;
+      }
       if (s.pendingRepair) {
         return `<div style="font-size:0.78rem;color:#c8821e;padding:7px 12px 8px;border-top:1px solid var(--border);display:flex;align-items:center;gap:6px">⏳ Awaiting repair port assignment at start of next turn</div>`;
       }
+      if (!needsRepair) return '';
+      const juryUsed = s.juryRigTurn === currentTurn;
       return `<div style="display:flex;gap:6px;padding:8px 12px;border-top:1px solid var(--border)">
         <button class="btn btn-sm" style="flex:1;background:rgba(200,130,30,0.12);color:#c8821e;border-color:#c8821e${juryUsed?';opacity:0.45;cursor:not-allowed':''}"
           ${juryUsed ? 'disabled' : `onclick="juryRigRepair('${id}')"`}>
@@ -3933,7 +3927,7 @@ function _calcPortRepair(port, spCurrent, spMax, structuralDamage, shipLocation)
   const damaged = Math.max(0, spMax - spCurrent);
   const costPerSP = isMajor ? 1 : 2;
   const structArr = structuralDamage || [];
-  const cost = damaged * costPerSP + (isMajor ? structArr.length * 10 : 0);
+  const cost = damaged * costPerSP + structArr.length * (isMajor ? 10 : 20);
   const spPct = spMax > 0 ? damaged / spMax : 0;
   const repairTurns = isMajor ? (spPct >= 0.5 ? 2 : spPct >= 0.25 ? 1 : 0) : (spPct >= 0.5 ? 2 : 1);
   const locMatch = (shipLocation || '').match(/Zone\s*(\d+)/i);
@@ -4318,9 +4312,42 @@ window.onShipStatusChange = function() {
 window.sendForRepair = async function(id) {
   const s = (appData.ships || {})[id];
   if (!s) return;
-  if (!confirm(`Send ${s.name} for repairs?\n\nA repair port will be assigned at the start of the next turn based on the nearest friendly port to the ship's current location. Repair costs will be deducted automatically.`)) return;
+  if (!confirm(`Send ${s.name} for repairs?\n\nA repair port will be assigned at the start of the next turn. You will be asked to authorise costs before repairs begin.`)) return;
   await update(cref(`/ships/${id}`), { pendingRepair: true, squadron: '' });
   showToast(`${s.name} — repair pending, port assigned next turn`);
+};
+
+window.authoriseRepair = async function(id) {
+  const s = (appData.ships || {})[id];
+  if (!s || !s.pendingRepairAuth) return;
+  const pra = s.pendingRepairAuth;
+  const currentTurn = (appData.meta || {}).turn || 1;
+  const availTurn = currentTurn + pra.totalTurns;
+  const costLine = pra.cost > 0 ? `${pra.cost} resources` : 'no cost';
+  const turnsLine = pra.totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready immediately';
+  if (!confirm(`Authorise repairs for ${s.name} at ${pra.port}?\n\nCost: ${costLine}${turnsLine}`)) return;
+  const multiUpdate = {};
+  multiUpdate[`/ships/${id}/status`]            = 'repairing';
+  multiUpdate[`/ships/${id}/repairPort`]        = pra.port;
+  multiUpdate[`/ships/${id}/repairCostPaid`]    = pra.cost;
+  multiUpdate[`/ships/${id}/availableIn`]       = pra.totalTurns > 0 ? `Turn ${availTurn}` : '';
+  multiUpdate[`/ships/${id}/pendingRepairAuth`] = null;
+  if (s.player && s.player !== 'merchant') {
+    const pl = (appData.players || {})[s.player];
+    if (pl) {
+      const curRes = pl.resources ?? 0;
+      multiUpdate[`/players/${s.player}/resources`] = Math.max(0, curRes - pra.cost);
+    }
+  }
+  const repairLogKey = `repair_assigned_${id}_${Date.now()}`;
+  multiUpdate[`/log/${repairLogKey}`] = {
+    type: 'repair_assigned', turn: currentTurn, timestamp: new Date().toISOString(),
+    shipName: s.name, shipId: id, playerId: s.player, port: pra.port, cost: pra.cost,
+    availableTurn: pra.totalTurns > 0 ? availTurn : currentTurn,
+    text: `${s.name} assigned to ${pra.port} for repairs (${pra.cost} resources${pra.totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready same turn'}).`,
+  };
+  await update(cref('/'), multiUpdate);
+  showToast(`${s.name} — repairs authorised at ${pra.port}`);
 };
 
 window.juryRigRepair = async function(id) {
