@@ -763,7 +763,8 @@ window.adjustTurn = async function(delta) {
       const repairLogKey = `repair_assigned_${id}_${Date.now()}`;
       multiUpdate[`/log/${repairLogKey}`] = {
         type: 'repair_assigned', turn: newVal, timestamp: new Date().toISOString(),
-        shipName: s.name, port, cost,
+        shipName: s.name, shipId: id, playerId: s.player, port, cost,
+        availableTurn: totalTurns > 0 ? availTurn : newVal,
         text: `${s.name} assigned to ${port} for repairs (${cost} resources${totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready same turn'}).`,
       };
     });
@@ -2340,18 +2341,19 @@ function renderHistory() {
     dispatchByTurn[t].push({id, ...e});
   }
 
-  // Index ship events by the turn they completed repair (availableIn) or were lost
+  // Index repairs by the turn the ship was assigned — driven from log entries
+  // (availableTurn stored explicitly; fallback: parse from text for older entries)
   const repairsCompletedByTurn = {};
-  const lostByTurn = {};
-  for (const [, s] of Object.entries(ships)) {
-    if (s.availableIn) {
-      const m = s.availableIn.match(/\d+/);
-      if (m) {
-        const t = parseInt(m[0]);
-        if (!repairsCompletedByTurn[t]) repairsCompletedByTurn[t] = [];
-        repairsCompletedByTurn[t].push(s);
-      }
+  for (const [, e] of Object.entries(log)) {
+    if (e.type !== 'repair_assigned') continue;
+    let t = e.availableTurn;
+    if (!t) {
+      const m = (e.text || '').match(/available Turn (\d+)/);
+      t = m ? parseInt(m[1]) : null;
     }
+    if (!t) continue;
+    if (!repairsCompletedByTurn[t]) repairsCompletedByTurn[t] = [];
+    repairsCompletedByTurn[t].push(e); // push the log entry, not the ship
   }
 
   const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧', promotion:'🎖' };
@@ -2395,7 +2397,7 @@ function renderHistory() {
         const oppNames = (e.opponents || []).map(oid => {
           const op = players[oid]; return op ? `${FACTION_FLAG[op.faction]||''} ${op.officerName||op.name}` : oid;
         }).join(', ');
-        html += `<div style="background:var(--surface);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:0.82rem;border:1px solid var(--border)">
+        html += `<div onclick="showTab('log');setTimeout(()=>{const el=document.getElementById('letter-${e.id}');if(el){const card=el.closest('.report-card');card.scrollIntoView({behavior:'smooth',block:'start'});if(el.classList.contains('letter-collapsed'))toggleLetter('${e.id}');}},80)" style="background:var(--surface);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:0.82rem;border:1px solid var(--border);cursor:pointer;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span style="font-weight:600">${flag} ${rp.officerName || rp.name || e.reporter || '—'}</span>
             ${oppNames ? `<span style="color:var(--text-muted);font-size:0.78rem">vs ${oppNames}</span>` : ''}
@@ -2418,20 +2420,22 @@ function renderHistory() {
       html += `</div>`;
     }
 
-    const fleetEvents = [...repairsDone.map(s => {
-      const p = players[s.player] || {};
-      return { icon:'⚓', text:`<strong>${s.name}</strong> returned from repairs <span style="color:var(--text-muted)">(${p.name||s.player})</span>` };
+    const fleetEvents = [...repairsDone.map(e => {
+      const p = players[e.playerId] || {};
+      const flag = FACTION_FLAG[p.faction] || '';
+      return { icon:'⚓', player: e.playerId, flag, text:`<strong>${e.shipName}</strong> returned from repairs at ${e.port||'port'}` };
     }), ...shipEvents.map(s => {
       const owner = players[s.player] || {};
+      const flag = FACTION_FLAG[owner.faction || s.faction] || '';
       let icon = '💥', desc = '';
       if (s.status === 'sunk') {
         if (s.sunkBy === '__accident__') desc = 'lost to accident';
         else if (s.sunkBy === '__lost_on_passage__') desc = 'lost on passage';
-        else { const sinker = ships[s.sunkBy]; desc = `sunk${sinker?` by <strong>${sinker.name}</strong>`:'`'}`; }
+        else { const sinker = ships[s.sunkBy]; desc = `sunk${sinker ? ` by <strong>${sinker.name}</strong>` : ''}`; }
       } else if (s.status === 'lost') {
-        icon = '⚔'; const captor = ships[s.capturedBy]; desc = `captured${captor?` by <strong>${captor.name}</strong>`:''}`;
+        icon = '⚔'; const captor = ships[s.capturedBy]; desc = `captured${captor ? ` by <strong>${captor.name}</strong>` : ''}`;
       } else if (s.status === 'sold') { icon = '💰'; desc = 'sold'; }
-      return { icon, text:`<strong>${s.name}</strong> ${desc} <span style="color:var(--text-muted)">(${owner.name||s.player})</span>` };
+      return { icon, player: s.player, flag, text:`<strong>${s.name}</strong> — ${desc}` };
     })];
 
     if (fleetEvents.length) {
@@ -2439,25 +2443,34 @@ function renderHistory() {
       html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${gap} 0 6px">Fleet Events</div>`;
       html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
       fleetEvents.forEach((ev, i) => {
-        html += `<div style="display:flex;align-items:flex-start;gap:10px;padding:7px 12px;${i>0?'border-top:1px solid var(--border)':''}">
-          <span style="flex-shrink:0;line-height:1.3">${ev.icon}</span>
-          <span style="font-size:0.82rem;line-height:1.4">${ev.text}</span>
+        const clickable = ev.player && players[ev.player];
+        const border = i > 0 ? 'border-top:1px solid var(--border);' : '';
+        const cursor = clickable ? 'cursor:pointer;' : '';
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;${border}${cursor}"
+          ${clickable ? `onclick="showTab('${ev.player}')" onmouseover="this.style.background='var(--surface1)'" onmouseout="this.style.background=''"` : ''}>
+          <span style="flex-shrink:0">${ev.icon}</span>
+          ${ev.flag ? `<span style="flex-shrink:0">${ev.flag}</span>` : ''}
+          <span style="font-size:0.82rem;flex:1">${ev.text}</span>
+          ${clickable ? `<span style="font-size:0.72rem;color:var(--text-muted);flex-shrink:0">View →</span>` : ''}
         </div>`;
       });
       html += `</div>`;
     }
 
-    if (interceptions.length) {
+    const battles = interceptions.filter(r => r.intercepts || r.chosen);
+    if (battles.length) {
       const gap = dispatches.length || officerEvents.length || fleetEvents.length ? '10px' : '0';
-      html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${gap} 0 6px">Interception Checks</div>`;
+      html += `<div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text-muted);margin:${gap} 0 6px">Battles</div>`;
       html += `<div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden">`;
-      interceptions.forEach((r, i) => {
-        const col = r.intercepts ? 'var(--accent)' : 'var(--text-muted)';
-        const modNote = r.mod !== 0 ? ` (+${r.mod}→${r.total})` : '';
-        html += `<div style="display:flex;align-items:center;gap:10px;padding:6px 12px;font-size:0.8rem;${i>0?'border-top:1px solid var(--border)':''}">
+      battles.forEach((r, i) => {
+        const label = r.chosen
+          ? `<span style="font-size:0.75rem;color:var(--text-muted);font-style:italic">Battle chosen</span>`
+          : `<span style="font-size:0.75rem;color:var(--accent)">Intercepted</span>`;
+        html += `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;font-size:0.82rem;${i>0?'border-top:1px solid var(--border)':''}">
+          <span style="color:var(--accent);flex-shrink:0">⚔</span>
           <span style="color:var(--text-muted);min-width:52px;flex-shrink:0">${r.zone}</span>
           <span style="flex:1">${r.seekerName} vs ${r.targetName}</span>
-          <span style="white-space:nowrap;font-weight:600;color:${col}">${r.d1}+${r.d2}=${r.raw}${modNote} — ${r.intercepts?'⚔ Battle':'Miss'}</span>
+          ${label}
         </div>`;
       });
       html += `</div>`;
@@ -2893,8 +2906,27 @@ function renderOrders() {
     html += `</div>`;
   }
 
-  // Generated mission display area
-  html += `<div id="mission-output"></div>`;
+  // Generated mission display area — restore saved mission if present
+  const cm = (appData.meta || {}).currentMission;
+  if (cm && cm.html) {
+    const locked = cm.locked || false;
+    html += `<div id="mission-output">${cm.html}</div>`;
+    // Patch the lock/regen buttons after render via a deferred script
+    html += `<script>
+      (function() {
+        var lockBtn = document.getElementById('mission-lock-btn');
+        var regenBtn = document.getElementById('mission-regen-btn');
+        if (lockBtn) lockBtn.textContent = ${JSON.stringify(locked ? '🔓 Unlock' : '🔒 Lock')};
+        if (regenBtn) {
+          regenBtn.disabled = ${locked};
+          regenBtn.style.opacity = ${locked ? '"0.4"' : '""'};
+          regenBtn.style.pointerEvents = ${locked ? '"none"' : '""'};
+        }
+      })();
+    <\/script>`;
+  } else {
+    html += `<div id="mission-output"></div>`;
+  }
 
   return html;
 }
@@ -2917,7 +2949,7 @@ function _shipsBySquadron(ships) {
   `).join('');
 }
 
-window.generateMission = function(location) {
+window.generateMission = async function(location) {
   const ships   = appData.ships   || {};
   const players = appData.players || {};
 
@@ -3040,7 +3072,10 @@ window.generateMission = function(location) {
           <div style="font-family:'Cinzel',serif;font-size:1.15rem;color:var(--accent)">${mission.name}</div>
           <div style="font-size:0.78rem;color:var(--text-muted)">${location} · Turn ${(appData.meta||{}).turn||1}</div>
         </div>
-        <button class="btn btn-ghost btn-sm" style="margin-left:auto" data-loc="${location.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.loc)">🎲 Regenerate</button>
+        <div style="display:flex;gap:6px;margin-left:auto">
+          <button class="btn btn-ghost btn-sm" id="mission-lock-btn" onclick="toggleMissionLock()">🔒 Lock</button>
+          <button class="btn btn-ghost btn-sm" id="mission-regen-btn" data-loc="${location.replace(/"/g,'&quot;')}" onclick="generateMission(this.dataset.loc)">🎲 Regenerate</button>
+        </div>
       </div>
 
       <p style="font-style:italic;color:var(--text-muted);font-size:0.88rem;border-left:3px solid var(--accent);padding-left:12px;margin:14px 0">${flavour}${deployment.flavourNote ? `<br><br>${deployment.flavourNote}` : ''}${['Drifting Fog','Heavy Fog','Hazy'].includes(effectiveWeather.name) && Math.random() < 0.4 ? '<br><br>"It was only for a moment. I thought I saw a shape."' : ''}${(() => { const pool = RANDOM_QUOTES.filter(q => !q.missions || q.missions.includes(mission.id)); const q = pool.length && Math.random() < 0.25 ? pool[Math.floor(Math.random()*pool.length)] : null; return q ? `<br><br>${q.text}` : ''; })()}</p>
@@ -3146,6 +3181,27 @@ window.generateMission = function(location) {
     </div>`;
 
   out.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Save mission to Firebase so it persists across refreshes
+  await update(cref('/meta'), {
+    currentMission: { location, html: out.innerHTML, locked: false }
+  });
+};
+
+window.toggleMissionLock = async function() {
+  const cm = (appData.meta || {}).currentMission;
+  if (!cm) return;
+  const locked = !cm.locked;
+  await update(cref('/meta/currentMission'), { locked });
+  // Update button states immediately
+  const lockBtn = document.getElementById('mission-lock-btn');
+  const regenBtn = document.getElementById('mission-regen-btn');
+  if (lockBtn) lockBtn.textContent = locked ? '🔓 Unlock' : '🔒 Lock';
+  if (regenBtn) {
+    regenBtn.disabled = locked;
+    regenBtn.style.opacity = locked ? '0.4' : '';
+    regenBtn.style.pointerEvents = locked ? 'none' : '';
+  }
 };
 
 // ─── LOG ──────────────────────────────────────────────────────────────────────
