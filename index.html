@@ -1386,10 +1386,11 @@ function renderMerchant() {
     <div style="font-size:0.78rem;margin-bottom:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
       ${_convoyProgress(originZone, destZone, currentZone)}
     </div>
-    <div style="font-size:0.78rem;color:${arrived?'var(--green)':'var(--text-muted)'}">
-      ${arrived
+    <div style="font-size:0.78rem;color:${arrived?'var(--green)':'var(--text-muted)'};display:flex;align-items:center;gap:8px">
+      <span>${arrived
         ? `🏁 Convoy has arrived at ${convoy.destination}`
-        : `Currently in Zone ${currentZone} — ${Math.abs(destZone - currentZone)} zone${Math.abs(destZone-currentZone)!==1?'s':''} remaining`}
+        : `Currently in Zone ${currentZone} — ${Math.abs(destZone - currentZone)} zone${Math.abs(destZone-currentZone)!==1?'s':''} remaining`}</span>
+      ${!arrived ? `<button class="btn btn-sm" style="font-size:0.7rem;padding:2px 8px;opacity:0.75" onclick="openAdjustConvoyZone()">Adjust</button>` : ''}
     </div>` : originZone && destZone && originZone === destZone
       ? `<div style="font-size:0.78rem;color:var(--red)">Origin and destination must be in different zones.</div>` : ''}
   </div>
@@ -1420,6 +1421,43 @@ function renderMerchant() {
   html += `</div>`;
   return html;
 }
+
+window.openAdjustConvoyZone = function() {
+  const convoy = appData.convoy || {};
+  const originZone = PORT_ZONE[convoy.origin] || 1;
+  const destZone   = PORT_ZONE[convoy.destination] || 1;
+  const min = Math.min(originZone, destZone);
+  const max = Math.max(originZone, destZone);
+  const options = [];
+  for (let z = min; z <= max; z++) options.push(z);
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Adjust Convoy Zone</h2>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px">Manually set the convoy's current zone. Also updates all merchant ship locations.</p>
+    <div class="form-row"><label>Current Zone</label>
+      <select id="adj-zone" style="font-size:0.9rem">
+        ${options.map(z => `<option value="${z}"${(convoy.currentZone||originZone)===z?' selected':''}>${z}</option>`).join('')}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="applyAdjustConvoyZone()">Apply</button>
+    </div>`);
+};
+
+window.applyAdjustConvoyZone = async function() {
+  const zone = parseInt(document.getElementById('adj-zone')?.value);
+  if (!zone) return;
+  const updates = { '/convoy/currentZone': zone };
+  const newLocation = `Zone ${zone}`;
+  Object.entries(appData.ships || {}).forEach(([id, s]) => {
+    if ((s.player === 'merchant' || s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction)) && s.status === 'active') {
+      updates[`/ships/${id}/location`] = newLocation;
+    }
+  });
+  await update(cref('/'), updates);
+  closeModal();
+  showToast(`Convoy moved to Zone ${zone}`);
+};
 
 window.saveConvoyRoute = async function() {
   const origin = document.getElementById('convoy-origin')?.value || '';
@@ -3294,9 +3332,11 @@ function renderRules() {
 
 function renderLog() {
   const log = appData.log || {};
-  const entries = Object.entries(log).sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
+  const entries = Object.entries(log)
+    .filter(([,e]) => e.type === 'dispatch')
+    .sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
   let html = `<div class="ships-header"><div>Dispatches</div><button class="btn btn-sm" onclick="openAddLog()">+ Dispatch</button></div>`;
-  if (!entries.length) html += `<div class="empty-state">No reports logged yet.</div>`;
+  if (!entries.length) html += `<div class="empty-state">No dispatches yet.</div>`;
   else html += entries.map(([id,e]) => _reportCardHtml(id, e)).join('');
   return html;
 }
