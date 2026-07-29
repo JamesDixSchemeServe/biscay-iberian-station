@@ -3659,10 +3659,58 @@ window.confirmAdvanceTurn = function() {
     reminders = `<div style="font-size:0.85rem;color:var(--green);padding:8px 0">✓ No outstanding actions.</div>`;
   }
 
+  // Build "what will happen" section
+  let actions = '';
+
+  // Ships arriving at repair port (pendingRepair)
+  const arrivingRepair = Object.values(ships).filter(s => s.status === 'repairing' && s.pendingRepair);
+  arrivingRepair.forEach(s => {
+    const port = _findRepairPort(s.faction, s.location);
+    actions += row('🔧', `<strong>${s.name}</strong> arrives at ${port || 'repair port'} — awaiting authorisation`);
+  });
+
+  // Ships completing repair
+  const completingRepair = Object.values(ships).filter(s => s.status === 'repairing' && s.availableIn === `Turn ${nextTurn}`);
+  completingRepair.forEach(s => {
+    actions += row('⚓', `<strong>${s.name}</strong> returns to active service (repair complete)`);
+  });
+
+  // Prizes being resolved
+  const pendingPrizes = Object.values(ships).filter(s => s.status === 'captured' && s.prizePort && !s.prizeResolution);
+  pendingPrizes.forEach(s => {
+    const label = s.prizeReroll ? 're-roll' : 'prize roll';
+    actions += row('🏴', `<strong>${s.name}</strong> — ${label} on arrival at ${s.prizePort}`);
+  });
+
+  // Resource income
+  const milPlayers = Object.entries(players).filter(([,p]) => p.faction && p.faction !== 'Merchant' && !MERCHANT_FACTIONS.includes(p.faction));
+  if (milPlayers.length && nextTurn >= 2) {
+    const income = nextTurn <= 3 ? 500 : 250;
+    actions += row('💰', `Each player receives <strong>+${income} resources</strong> (Turn ${nextTurn})`);
+  }
+
+  // Merchant convoy movement
+  const convoy = appData.convoy || {};
+  const originZone = PORT_ZONE[convoy.origin];
+  const destZone = PORT_ZONE[convoy.destination];
+  if (originZone && destZone && originZone !== destZone) {
+    const currentZone = convoy.currentZone || originZone;
+    if (currentZone !== destZone) {
+      const nextZone = currentZone + (destZone > originZone ? 1 : -1);
+      actions += row('⛵', `Merchant Convoy moves to <strong>Zone ${nextZone}</strong>${nextZone === destZone ? ` — arriving at ${convoy.destination}` : ''}`);
+    }
+  }
+
+  const actionsHtml = actions
+    ? `<div class="section-label" style="margin-top:12px;color:var(--text-muted)">Actions on Advance</div>
+       <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;margin-bottom:4px">${actions}</div>`
+    : '';
+
   showModal(`<button class="modal-close" onclick="closeModal()">×</button>
     <h2>Advance to Turn ${nextTurn}</h2>
     <p style="font-size:0.9rem;color:var(--text-muted);margin:0 0 4px">Advance from <strong>Turn ${currentTurn}</strong> to <strong>Turn ${nextTurn}</strong>?</p>
     ${reminders}
+    ${actionsHtml}
     <div style="font-size:0.78rem;color:var(--text-muted);margin-top:12px;padding:8px;background:var(--surface2);border-radius:4px">
       Movement confirmations and interception rolls will be reset for Turn ${nextTurn}.
     </div>
