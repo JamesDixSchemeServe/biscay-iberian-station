@@ -423,6 +423,15 @@ const HISTORICAL_SHIP_DB = [{"id":"gb_h1","name":"HMS Victory","nation":"British
 const SHIP_TYPES = ['1st Rate','2nd Rate','3rd Rate','4th Rate','Razee','Heavy Frigate','5th Rate Frigate','6th Rate','Ship-Sloop','Brig-Sloop','Gun Brig','Corvette','Cutter','Schooner','Lugger','Gunboat','Bomb Vessel','Xebec','Large Xebec','Polacre','Galley','Galiot','Tartane','Felucca','Merchantman','East Indiaman','Manila Galleon','Packet Ship','Privateer','Privateer Schooner','Privateer Brig','Privateer Cutter','Letter of Marque'];
 const RATED_SHIP_TYPES = new Set(['1st Rate','2nd Rate','3rd Rate','4th Rate','Razee','Heavy Frigate','5th Rate Frigate','6th Rate']);
 function _isRated(type) { return RATED_SHIP_TYPES.has(type); }
+function _shipRateCategory(type) {
+  const t = type || '';
+  if (['1st Rate','2nd Rate'].includes(t)) return 'line';       // requires favour +2 in phase 3
+  if (['3rd Rate','4th Rate'].includes(t)) return 'heavy';      // requires favour +1
+  if (['Heavy Frigate','5th Rate Frigate','6th Rate','Razee'].includes(t)) return 'frigate';  // phase 2 limit
+  return 'light';
+}
+function _is6thRate(type) { return type === '6th Rate'; }
+function _isFrigate(type) { return ['Heavy Frigate','5th Rate Frigate','6th Rate'].includes(type); }
 const FACTIONS = ['British','French','Spanish'];
 const MERCHANT_FACTIONS = ['Dutch','Swedish','Danish','American','Prussian','Ottoman','Portuguese','Genoese','Venetian','Ragusian','Other'];
 const FACTION_COLOR = { British:'var(--british)', French:'var(--french)', Spanish:'var(--spanish)', Merchant:'var(--merchant)', Dutch:'var(--merchant)', Swedish:'var(--merchant)', Danish:'var(--merchant)', American:'var(--merchant)', Prussian:'var(--merchant)', Ottoman:'var(--merchant)', Portuguese:'var(--merchant)', Genoese:'var(--merchant)', Venetian:'var(--merchant)', Ragusian:'var(--merchant)', Other:'var(--merchant)' };
@@ -877,6 +886,36 @@ window.adjustTurn = async function(delta) {
     if (milPlayers.length) showToast(`Turn ${newVal}: each player received +${income} resources`);
   }
 
+  // Admiralty Favour -2 consecutive turns — officer recall roll
+  if (delta > 0) {
+    Object.entries(appData.players || {}).forEach(([pid, p]) => {
+      if (p.faction === 'Merchant' || MERCHANT_FACTIONS.includes(p.faction)) return;
+      if ((p.admiraltyFavour || 0) <= -2) {
+        const streak = (p.disfavourTurns || 0) + 1;
+        multiUpdate[`/players/${pid}/disfavourTurns`] = streak;
+        if (streak >= 2) {
+          const roll = Math.ceil(Math.random() * 6);
+          if (roll <= 2) {
+            multiUpdate[`/players/${pid}/status`] = 'recalled';
+            const logKey = `recall_${pid}_${newVal}`;
+            multiUpdate[`/log/${logKey}`] = { type: 'officer_recall', turn: newVal, timestamp: new Date().toISOString(), playerId: pid, officerName: p.officerName || p.name, text: `${p.officerName || p.name} recalled by the Admiralty — two turns at Loss of Confidence (roll: ${roll})` };
+            showToast(`⚠ ${p.officerName || p.name} recalled by the Admiralty! (rolled ${roll})`);
+          }
+        }
+      } else {
+        if (p.disfavourTurns) multiUpdate[`/players/${pid}/disfavourTurns`] = 0;
+      }
+    });
+  }
+
+  // Reset per-turn favour repair benefit usage
+  if (delta > 0) {
+    Object.keys(appData.players || {}).forEach(pid => {
+      multiUpdate[`/players/${pid}/favourRepairUsedTurn`] = null;
+      multiUpdate[`/players/${pid}/favourSpeedUsedTurn`] = null;
+    });
+  }
+
   multiUpdate['/meta/movementDone']     = {};
   multiUpdate['/meta/interceptionUsed'] = {};
   await update(cref('/'), multiUpdate);
@@ -1060,11 +1099,21 @@ function renderFaction(faction) {
   for (const [pid, p] of players) {
     const favClass = p.admiraltyFavour > 0 ? 'fav-pos' : p.admiraltyFavour < 0 ? 'fav-neg' : 'fav-zero';
     const favLabel = p.admiraltyFavour > 0 ? `+${p.admiraltyFavour}` : `${p.admiraltyFavour}`;
+    const isPostCaptain = (p.rank || _ranksForFaction(p.faction)[0]) === 'Post Captain';
+    const favour = p.admiraltyFavour || 0;
+    const perks = [];
+    if (isPostCaptain) perks.push('Reroll one Skill Test per turn');
+    if (favour >= 2) perks.push('Reroll one Skill Test (once per game)');
+    if (favour >= 1) perks.push(p.favourRepairUsedTurn === ((appData.meta||{}).turn||1) ? 'Half-cost repair ✓ used' : 'Half-cost repair available');
+    if (favour >= 2) perks.push(p.favourSpeedUsedTurn === ((appData.meta||{}).turn||1) ? 'Repair 1 turn faster ✓ used' : 'Repair 1 turn faster available');
+    if (favour <= -2) perks.push('⚠ Loss of Confidence — crew max Inexperienced');
+    else if (favour === -1) perks.push('⚠ Disfavour — crew max Regular');
     html += `<div class="player-card" onclick="showPlayerModal('${pid}')">
       <h3>${FACTION_FLAG[p.faction]||''} ${p.name}</h3>
       <div style="font-size:0.75rem;color:var(--text-muted)">${p.officerName} · ${p.rank||_ranksForFaction(p.faction)[0]}</div>
       <div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">resources</span></div>
       <div class="favour">Favour: <span class="favour-val ${favClass}">${favLabel}</span></div>
+      ${perks.length ? `<div style="margin-top:5px;display:flex;flex-direction:column;gap:2px">${perks.map(pk => `<div style="font-size:0.68rem;color:var(--text-muted);font-style:italic">${pk}</div>`).join('')}</div>` : ''}
     </div>`;
   }
   html += `</div>`;
@@ -1337,11 +1386,19 @@ function shipCard(id, s) {
         const availTurn = currentTurn + pra.totalTurns;
         const costLine = pra.cost > 0 ? `${pra.cost} resources` : 'no cost';
         const turnsLine = pra.totalTurns > 0 ? `, available Turn ${availTurn}` : ', ready immediately';
+        const pl = (appData.players||{})[s.player] || {};
+        const favour = pl.admiraltyFavour || 0;
+        const currTurn = currentTurn;
+        const halfCostAvail = favour >= 1 && pl.favourRepairUsedTurn !== currTurn && pra.cost > 0;
+        const fasterAvail   = favour >= 2 && pl.favourSpeedUsedTurn !== currTurn && pra.totalTurns > 0;
+        const halfCostBadge = halfCostAvail ? `<button class="btn btn-sm" style="background:rgba(100,160,80,0.15);color:#5a9e3e;border-color:#5a9e3e;font-size:0.72rem" onclick="favourHalfCost('${id}')">⭐ Call in a Favour — Half Cost (${Math.ceil(pra.cost/2)} res)</button>` : '';
+        const fasterBadge   = fasterAvail   ? `<button class="btn btn-sm" style="background:rgba(100,160,80,0.15);color:#5a9e3e;border-color:#5a9e3e;font-size:0.72rem" onclick="favourFasterRepair('${id}')">⭐ Call in a Favour — 1 Turn Faster</button>` : '';
         return `<div style="border-top:1px solid var(--border);padding:8px 12px">
           <div style="font-size:0.78rem;color:#c8821e;margin-bottom:6px">🔧 Awaiting authorisation for repairs at <strong>${pra.port}</strong> — ${costLine}${turnsLine}</div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm" style="background:rgba(200,130,30,0.18);color:#c8821e;border-color:#c8821e" onclick="authoriseRepair('${id}')">✅ Authorise Repairs</button>
             <button class="btn btn-sm" style="background:rgba(180,60,60,0.12);color:#c05050;border-color:#c05050" onclick="cancelRepair('${id}')">✕ Cancel</button>
+            ${halfCostBadge}${fasterBadge}
           </div>
         </div>`;
       }
@@ -4610,6 +4667,52 @@ window.authoriseRepair = async function(id) {
   showToast(`${s.name} — repairs authorised at ${pra.port}`);
 };
 
+window.favourHalfCost = async function(id) {
+  const s = (appData.ships || {})[id];
+  if (!s || !s.pendingRepairAuth) return;
+  const pra = s.pendingRepairAuth;
+  const halvedCost = Math.ceil(pra.cost / 2);
+  const currentTurn = (appData.meta || {}).turn || 1;
+  if (!confirm(`Call in a Favour: repair ${s.name} at half cost (${halvedCost} resources instead of ${pra.cost})?\n\nThis benefit can only be used once per turn.`)) return;
+  const pl = (appData.players || {})[s.player];
+  const multiUpdate = {};
+  multiUpdate[`/ships/${id}/status`]            = 'repairing';
+  multiUpdate[`/ships/${id}/repairPort`]        = pra.port;
+  multiUpdate[`/ships/${id}/repairCostPaid`]    = halvedCost;
+  const availTurn = currentTurn + pra.totalTurns;
+  multiUpdate[`/ships/${id}/availableIn`]       = pra.totalTurns > 0 ? `Turn ${availTurn}` : '';
+  multiUpdate[`/ships/${id}/pendingRepairAuth`] = null;
+  if (pl) multiUpdate[`/players/${s.player}/resources`] = Math.max(0, (pl.resources || 0) - halvedCost);
+  multiUpdate[`/players/${s.player}/favourRepairUsedTurn`] = currentTurn;
+  const logKey = `repair_assigned_${id}_${Date.now()}`;
+  multiUpdate[`/log/${logKey}`] = { type: 'repair_assigned', turn: currentTurn, timestamp: new Date().toISOString(), shipName: s.name, shipId: id, playerId: s.player, port: pra.port, cost: halvedCost, text: `${s.name} assigned to ${pra.port} — half cost via Admiralty Favour (${halvedCost} resources).` };
+  await update(cref('/'), multiUpdate);
+  showToast(`${s.name} — repairs authorised at half cost`);
+};
+
+window.favourFasterRepair = async function(id) {
+  const s = (appData.ships || {})[id];
+  if (!s || !s.pendingRepairAuth) return;
+  const pra = s.pendingRepairAuth;
+  const currentTurn = (appData.meta || {}).turn || 1;
+  const fasterTurns = Math.max(0, pra.totalTurns - 1);
+  const availTurn = currentTurn + fasterTurns;
+  if (!confirm(`Call in a Favour: ${s.name} completes repairs 1 turn faster (available Turn ${availTurn})?\n\nThis benefit can only be used once per turn.`)) return;
+  const pl = (appData.players || {})[s.player];
+  const multiUpdate = {};
+  multiUpdate[`/ships/${id}/status`]            = 'repairing';
+  multiUpdate[`/ships/${id}/repairPort`]        = pra.port;
+  multiUpdate[`/ships/${id}/repairCostPaid`]    = pra.cost;
+  multiUpdate[`/ships/${id}/availableIn`]       = fasterTurns > 0 ? `Turn ${availTurn}` : '';
+  multiUpdate[`/ships/${id}/pendingRepairAuth`] = null;
+  if (pl) multiUpdate[`/players/${s.player}/resources`] = Math.max(0, (pl.resources || 0) - pra.cost);
+  multiUpdate[`/players/${s.player}/favourSpeedUsedTurn`] = currentTurn;
+  const logKey = `repair_assigned_${id}_${Date.now()}`;
+  multiUpdate[`/log/${logKey}`] = { type: 'repair_assigned', turn: currentTurn, timestamp: new Date().toISOString(), shipName: s.name, shipId: id, playerId: s.player, port: pra.port, cost: pra.cost, text: `${s.name} assigned to ${pra.port} — 1 turn faster via Admiralty Favour (available Turn ${availTurn}).` };
+  await update(cref('/'), multiUpdate);
+  showToast(`${s.name} — repairs expedited, available Turn ${availTurn}`);
+};
+
 window.cancelRepair = async function(id) {
   const s = (appData.ships || {})[id];
   if (!s) return;
@@ -4976,6 +5079,25 @@ window.saveNewShip = async function() {
         if (!confirm(`Warning: ${shipType} is a Rated vessel.\n\nA ${ranks[0]} may not command Rated ships — this officer must be promoted to ${ranks[1]} first.\n\nAdd this ship anyway?`)) return;
       }
     }
+    // Admiralty Favour — rate restrictions
+    const phase = (appData.meta || {}).phase || 1;
+    const favour = player ? (player.admiraltyFavour || 0) : 0;
+    const rateCategory = _shipRateCategory(shipType);
+    if (phase === 3 && rateCategory === 'line' && favour < 2) {
+      if (!confirm(`Phase III: 1st and 2nd Rates require Admiralty Favour +2 (current: ${favour >= 0 ? '+' : ''}${favour}). Add anyway?`)) return;
+    }
+    if (phase === 3 && rateCategory === 'heavy' && favour < 1) {
+      if (!confirm(`Phase III: 3rd and 4th Rates require Admiralty Favour +1 (current: ${favour >= 0 ? '+' : ''}${favour}). Add anyway?`)) return;
+    }
+    // Crew restrictions
+    const crewLevel = document.getElementById('as-crew').value;
+    const crewOrder = ['Inexperienced','Regular','Veteran'];
+    const crewIdx = crewOrder.indexOf(crewLevel);
+    if (favour <= -2 && crewIdx > 0) {
+      if (!confirm(`Admiralty Favour −2: replacement crews are limited to Inexperienced. Add with ${crewLevel} crew anyway?`)) return;
+    } else if (favour === -1 && crewIdx > 1) {
+      if (!confirm(`Admiralty Favour −1: replacement crews are limited to Regular. Add with Veteran crew anyway?`)) return;
+    }
     if (!confirm(`Purchase ${name} for ${cost} resources?\n\nRemaining after purchase: ${currentRes - cost} resources`)) return;
   }
 
@@ -5032,9 +5154,54 @@ window.saveShip = async function(id) {
     }
   }
 
+  // Phase squadron limits
+  if (data.squadron) {
+    const phase = (appData.meta || {}).phase || 1;
+    const sqnShips = Object.entries(appData.ships || {}).filter(([sid, s]) =>
+      sid !== id && s.player === data.player && s.squadron === data.squadron
+      && !['sunk','lost','sold','captured'].includes(s.status)
+    );
+    if (phase === 1) {
+      const sixth = sqnShips.filter(([,s]) => _is6thRate(s.type)).length + (_is6thRate(data.type) ? 1 : 0);
+      if (_is6thRate(data.type) && sixth > 1) {
+        if (!confirm(`Phase I rule: maximum one 6th Rate per squadron. Continue anyway?`)) return;
+      }
+    }
+    if (phase === 2) {
+      const frigates = sqnShips.filter(([,s]) => _isFrigate(s.type)).length + (_isFrigate(data.type) ? 1 : 0);
+      if (_isFrigate(data.type) && frigates > 2) {
+        if (!confirm(`Phase II rule: maximum two frigates (5th/6th Rates) per squadron. Continue anyway?`)) return;
+      }
+    }
+    if (phase === 3) {
+      const rate = _shipRateCategory(data.type);
+      if (rate === 'line') {
+        if (!confirm(`Phase III rule: 1st and 2nd Rates require special approval. Continue anyway?`)) return;
+      }
+    }
+  }
+
   // Scouts and screens must be detached from squadrons
   if (data.role === 'inshoreScout' || data.role === 'squadronScreen') {
     data.squadron = '';
+  }
+
+  // Admiralty Favour — crew level restrictions
+  if (data.player && data.player !== 'merchant') {
+    const pl = (appData.players || {})[data.player];
+    const favour = pl ? (pl.admiraltyFavour || 0) : 0;
+    const crewOrder = ['Inexperienced','Regular','Veteran'];
+    const crewIdx = crewOrder.indexOf(data.crewLevel);
+    if (favour <= -2 && crewIdx > 0) {
+      if (!confirm(`Admiralty Favour −2: replacement crews are limited to Inexperienced. Assign ${data.crewLevel} anyway?`)) return;
+    } else if (favour === -1 && crewIdx > 1) {
+      if (!confirm(`Admiralty Favour −1: replacement crews are limited to Regular. Assign Veteran anyway?`)) return;
+    }
+  }
+
+  // Admiralty Favour — rate restrictions (Phase III recruitment)
+  if (data.player && data.player !== 'merchant' && existing.status !== data.status) {
+    // Only warn when a ship is being newly added (status change from nothing) — edit handled in add flow
   }
 
   // Log previous name if renamed
