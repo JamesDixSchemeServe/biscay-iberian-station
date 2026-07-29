@@ -3719,24 +3719,27 @@ window.confirmAdvanceTurn = function() {
   // Build "what will happen" section
   let actions = '';
 
+  const pName = s => { const p = players[s.player]; return p ? ` <span style="color:var(--text-muted)">(${p.name})</span>` : ''; };
+  const pFlag = s => { const p = players[s.player]; return (p && FACTION_FLAG[p.faction]) ? FACTION_FLAG[p.faction] : '🔧'; };
+
   // Ships arriving at repair port (pendingRepair)
   const arrivingRepair = Object.values(ships).filter(s => s.status === 'repairing' && s.pendingRepair);
   arrivingRepair.forEach(s => {
     const port = _findRepairPort(s.faction, s.location);
-    actions += row('🔧', `<strong>${s.name}</strong> arrives at ${port || 'repair port'} — awaiting authorisation`);
+    actions += row(pFlag(s), `<strong>${s.name}</strong> arrives at ${port || 'repair port'} — awaiting authorisation${pName(s)}`);
   });
 
   // Ships completing repair
   const completingRepair = Object.values(ships).filter(s => s.status === 'repairing' && s.availableIn === `Turn ${nextTurn}`);
   completingRepair.forEach(s => {
-    actions += row('⚓', `<strong>${s.name}</strong> returns to active service (repair complete)`);
+    actions += row(pFlag(s), `<strong>${s.name}</strong> returns to active service at ${s.repairPort || 'port'} (repair complete)${pName(s)}`);
   });
 
   // Prizes being resolved
   const pendingPrizes = Object.values(ships).filter(s => s.status === 'captured' && s.prizePort && !s.prizeResolution);
   pendingPrizes.forEach(s => {
     const label = s.prizeReroll ? 're-roll' : 'prize roll';
-    actions += row('🏴', `<strong>${s.name}</strong> — ${label} on arrival at ${s.prizePort}`);
+    actions += row(pFlag(s), `<strong>${s.name}</strong> — ${label} on arrival at ${s.prizePort}${pName(s)}`);
   });
 
   // Resource income
