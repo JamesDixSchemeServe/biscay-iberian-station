@@ -1902,8 +1902,8 @@ function renderMap() {
 
   // Exclude sunk/lost ships
   const activeShips = Object.entries(ships).filter(([,s]) =>
-    s.location && s.status !== 'sunk' && s.status !== 'lost' && s.status !== 'captured'
-    && !(s.status === 'repairing' && s.pendingRepairAuth)
+    s.location && s.status !== 'sunk' && s.status !== 'lost' && s.status !== 'captured' && s.status !== 'sold'
+    && !(s.status === 'repairing' && (s.pendingRepairAuth || s.pendingRepair))
     && s.role !== 'inshoreScout' && s.role !== 'squadronScreen'
   );
 
