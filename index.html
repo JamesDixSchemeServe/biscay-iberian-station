@@ -625,6 +625,8 @@ function rebuildNav() {
       <button class="${currentTab==='log'?'active':''}" onclick="showTab('log')">Dispatches</button>
       <button class="${currentTab==='history'?'active':''}" onclick="showTab('history')">📜 History</button>
       <button class="${currentTab==='rules'?'active':''}" onclick="showTab('rules')">Rules</button>
+      <button onclick="openFeedback()" style="margin-left:auto;opacity:0.7">💬 Feedback</button>
+      ${Object.keys(appData.feedback||{}).length ? `<button onclick="openFeedbackInbox()" style="background:var(--accent);color:#fff;font-weight:700">📬 Inbox (${Object.keys(appData.feedback||{}).length})</button>` : ''}
     </div>
     <div class="nav-row">
       <span class="nav-label">Fleets</span>
@@ -690,7 +692,7 @@ function renderOverview() {
     const fShips = Object.values(ships).filter(s => s.faction === faction);
     const active    = fShips.filter(s => s.status === 'active');
     const repairing = fShips.filter(s => s.status === 'repairing');
-    const lost      = fShips.filter(s => ['sunk','sold'].includes(s.status));
+    const lost      = fShips.filter(s => ['sunk','sold','lost','captured'].includes(s.status));
     // All ships captured BY this faction — capturedBy points to a ship belonging to this faction
     const capturedByFaction = Object.values(ships).filter(s =>
       s.capturedBy && factionByShipId[s.capturedBy] === faction
@@ -1086,6 +1088,9 @@ function _shipKnots(type, fastSailer) {
 }
 function _shipBreak(type, spMax) {
   const t=(type||'').toLowerCase();
+  if (t.includes('merchant') || t.includes('brig-schooner') || t.includes('brig schooner') || MERCHANT_FACTIONS.some(f => t.includes(f.toLowerCase()))) {
+    return Math.max(1, Math.ceil((spMax||0)/2));
+  }
   const d=t.includes('1st rate')||t.includes('2nd rate')||t.includes('3rd rate')?3.5:t.includes('4th rate')||t.includes('5th rate')||t.includes('heavy frigate')?4:4.5;
   return Math.max(1,Math.round((spMax||0)/d));
 }
@@ -1457,6 +1462,66 @@ window.applyAdjustConvoyZone = async function() {
   await update(cref('/'), updates);
   closeModal();
   showToast(`Convoy moved to Zone ${zone}`);
+};
+
+// ─── FEEDBACK ─────────────────────────────────────────────────────────────────
+window.openFeedback = function() {
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Send Feedback / Ask a Question</h2>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px">Your message will be sent directly to the campaign admin.</p>
+    <div class="form-row"><label>Your name</label>
+      <input id="fb-name" type="text" placeholder="e.g. Captain Hornblower" style="font-size:0.9rem;width:100%">
+    </div>
+    <div class="form-row"><label>Message</label>
+      <textarea id="fb-message" rows="5" placeholder="Question, feedback, or issue..." style="font-size:0.9rem;width:100%;resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn" onclick="submitFeedback()">Send</button>
+    </div>`);
+};
+
+window.submitFeedback = async function() {
+  const name = document.getElementById('fb-name')?.value.trim();
+  const message = document.getElementById('fb-message')?.value.trim();
+  if (!message) { showToast('Please enter a message'); return; }
+  await push(cref('/feedback'), {
+    name: name || 'Anonymous',
+    message,
+    ts: Date.now(),
+    campaign: appData.meta?.name || '',
+    turn: appData.meta?.turn || 1,
+  });
+  closeModal();
+  showToast('Message sent — thank you!');
+};
+
+window.openFeedbackInbox = function() {
+  const entries = Object.entries(appData.feedback || {})
+    .sort(([,a],[,b]) => b.ts - a.ts);
+  const rows = entries.length
+    ? entries.map(([id, f]) => {
+        const d = new Date(f.ts);
+        const dateStr = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+        return `<div style="border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+            <strong>${f.name || 'Anonymous'}</strong>
+            <span style="font-size:0.78rem;color:var(--text-muted)">${dateStr} · Turn ${f.turn||'?'}</span>
+          </div>
+          <div style="font-size:0.9rem;white-space:pre-wrap">${f.message}</div>
+          <button class="btn btn-ghost" style="margin-top:8px;font-size:0.78rem" onclick="deleteFeedback('${id}')">Dismiss</button>
+        </div>`;
+      }).join('')
+    : '<p style="color:var(--text-muted);text-align:center">No messages yet.</p>';
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>Feedback Inbox</h2>
+    <div style="max-height:60vh;overflow-y:auto">${rows}</div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
+};
+
+window.deleteFeedback = async function(id) {
+  await remove(cref(`/feedback/${id}`));
+  openFeedbackInbox();
 };
 
 window.saveConvoyRoute = async function() {
