@@ -4996,7 +4996,7 @@ window.openAddShip = function(playerId, faction) {
     </div>
 
     <div class="form-row"><label>Ship Name</label><input id="as-name" placeholder="e.g. HMS Badger"></div>
-    <div class="form-row"><label>Location</label><select id="as-location">${ZONES.map(z=>`<option>${z}</option>`).join('')}</select></div>
+    <div class="form-row"><label>Location</label><select id="as-location">${(FACTION_PORTS[_asFaction] || FACTION_PORTS.Merchant).map(z=>`<option>${z}</option>`).join('')}</select></div>
 
     <div class="form-row"><label>Type</label><select id="as-type" onchange="asTypeChange()">${['',...SHIP_TYPES].map(t=>`<option value="${t}">${t||'— select type —'}</option>`).join('')}</select></div>
 
