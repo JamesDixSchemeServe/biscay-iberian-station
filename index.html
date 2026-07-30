@@ -931,6 +931,15 @@ function renderPlayer(pid) {
   const allShips = appData.ships || {};
   const favClass = p.admiraltyFavour > 0 ? 'fav-pos' : p.admiraltyFavour < 0 ? 'fav-neg' : 'fav-zero';
   const favLabel = p.admiraltyFavour > 0 ? `+${p.admiraltyFavour}` : `${p.admiraltyFavour}`;
+  const favour = p.admiraltyFavour || 0;
+  const isPostCaptain = (p.rank || _ranksForFaction(p.faction)[0]) === _ranksForFaction(p.faction)[1];
+  const perks = [];
+  if (isPostCaptain) perks.push('Reroll one Skill Test per turn');
+  if (favour >= 2) perks.push('Reroll one Skill Test once per battle');
+  if (favour >= 1) perks.push(p.favourRepairUsedTurn === ((appData.meta||{}).turn||1) ? 'Half-cost repair ✓ used' : 'Half-cost repair available');
+  if (favour >= 2) perks.push(p.favourSpeedUsedTurn === ((appData.meta||{}).turn||1) ? 'Repair 1 turn faster ✓ used' : 'Repair 1 turn faster available');
+  if (favour <= -2) perks.push('⚠ Loss of Confidence');
+  else if (favour === -1) perks.push('⚠ Under Scrutiny — promotions blocked');
 
   let html = `<div class="player-row" style="grid-template-columns:1fr">
     <div class="player-card" onclick="showPlayerModal('${pid}')" style="display:flex;gap:14px;align-items:flex-start">
@@ -942,6 +951,7 @@ function renderPlayer(pid) {
           <div><div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">resources</span></div></div>
           <div><div class="res"><span class="favour-val ${favClass}">${favLabel}</span> <span style="font-size:0.7rem;color:var(--text-muted)">admiralty favour</span></div></div>
         </div>
+        ${perks.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${perks.map(pk => `<span class="tag" style="font-size:0.7rem">${pk}</span>`).join('')}</div>` : ''}
       </div>
     </div>
   </div>`;
