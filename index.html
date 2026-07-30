@@ -129,7 +129,8 @@
   .form-row input, .form-row select, .form-row textarea { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); padding: 8px 10px; font-family: var(--font); font-size: 0.9rem; }
   .form-row input:focus, .form-row select:focus, .form-row textarea:focus { outline: none; border-color: var(--accent); }
   .form-row select option { background: var(--surface2); }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  @media(min-width:480px){ .form-grid { grid-template-columns: 1fr 1fr; } }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); flex-wrap: wrap; }
 
   /* Admin view */
@@ -142,7 +143,7 @@
 
   /* Favour track */
   .favour-track { display: flex; gap: 6px; justify-content: center; margin: 12px 0; }
-  .favour-pip { width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
+  .favour-pip { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; color: var(--text-muted); cursor: pointer; transition: all 0.2s; }
   .favour-pip.active { border-color: var(--accent); color: var(--accent); background: rgba(200,151,58,0.15); }
   .favour-pip.pos { border-color: var(--green); color: var(--green); }
   .favour-pip.neg { border-color: var(--red); color: var(--red); }
@@ -187,7 +188,7 @@
       linear-gradient(160deg, #f5e8cc 0%, #ecdcaa 20%, #f3e2b8 45%, #e9d59f 70%, #f0dcaa 100%);
     border: 1px solid #b8966a;
     border-radius: 2px;
-    padding: 40px 52px 44px 60px;
+    padding: 20px 20px 24px 24px;
     font-family: 'IM Fell English', Georgia, serif;
     font-size: 0.93rem;
     line-height: 1.95;
@@ -209,7 +210,7 @@
   .letter-parchment::after {
     content: '';
     position: absolute;
-    top: 0; bottom: 0; left: 44px;
+    top: 0; bottom: 0; left: 18px;
     width: 1px;
     background: rgba(180,120,60,0.25);
     pointer-events: none;
@@ -249,7 +250,7 @@
   }
   .letter-sig-name {
     font-family: 'Pinyon Script', cursive;
-    font-size: 4.8rem;
+    font-size: clamp(2.4rem, 8vw, 4.8rem);
     line-height: 1;
     color: #140a02;
     display: block;
@@ -2051,8 +2052,9 @@ function renderMap() {
     return `<div onclick="mapGroupClick('${b.encodedKey}')"
       style="position:absolute;left:${b.x}%;top:${b.y}%;transform:${transform};
              background:${b.col};color:white;border:3px solid ${b.ringCol};border-radius:16px;
-             padding:2px 8px;font-size:0.65rem;font-weight:700;cursor:pointer;
-             white-space:nowrap;box-shadow:${shadow};z-index:10;line-height:1.6;opacity:${opacity}">
+             padding:5px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;
+             white-space:nowrap;box-shadow:${shadow};z-index:10;line-height:1.6;opacity:${opacity};
+             min-height:36px;display:flex;align-items:center;gap:3px;touch-action:manipulation">
       ${b.flag} ${b.label} <span style="opacity:0.75;font-weight:400">(${b.totalCount})</span>${b.statusIcon}
     </div>`;
   }).join('');
@@ -3533,7 +3535,7 @@ window.openCampaignModal = function() {
   const playerListHtml = Object.entries(players).map(([pid, p]) =>
     `<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border)">
       <span>${FACTION_FLAG[p.faction]||''} <strong>${p.name}</strong> <span style="color:var(--text-muted)">${p.officerName||''} · ${p.faction}</span></span>
-      <button class="btn btn-sm btn-danger" style="padding:1px 8px;font-size:0.75rem" onclick="removePlayer('${pid}')">Remove</button>
+      <button class="btn btn-sm btn-danger" style="padding:6px 10px;font-size:0.78rem" onclick="removePlayer('${pid}')">Remove</button>
     </div>`
   ).join('') || `<div style="font-size:0.82rem;color:var(--text-muted);font-style:italic">No players yet.</div>`;
 
