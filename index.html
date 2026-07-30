@@ -4272,43 +4272,6 @@ function shipFormHtml(s) {
   return `
     <div class="form-row"><label>Ship Name</label><input id="sf-name" value="${s.name||''}"></div>
     ${isEscorting ? `<div style="margin:-4px 0 8px;padding:6px 10px;background:rgba(126,200,227,0.12);border:1px solid rgba(126,200,227,0.4);border-radius:6px;font-size:0.82rem;color:#7ec8e3">🛡 This ship is currently escorting a merchant convoy</div>` : ''}
-    <div class="form-grid">
-      <div class="form-row"><label>Type</label><select id="sf-type">${['', ...SHIP_TYPES].map(t=>`<option value="${t}"${s.type===t?' selected':''}>${t||'— select type —'}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Cost (resources)</label><input type="number" id="sf-cost" value="${s.cost||0}"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Rig</label><select id="sf-rig">
-        ${['Square','Fore and Aft','Lateen'].map(r=>`<option value="${r}"${(s.rig||_defaultRig(s.type))===r?' selected':''}>${r}</option>`).join('')}
-      </select></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>SP Current</label><input type="number" id="sf-spCurrent" value="${s.spCurrent||0}" min="0" oninput="recalcRepairCost()"></div>
-      <div class="form-row"><label>SP Max</label><input type="number" id="sf-spMax" value="${s.spMax||0}" min="1" oninput="recalcRepairCost()"></div>
-    </div>
-
-    <div class="section-label" style="margin-top:14px">Armament</div>
-    <div class="deck-header"><label>Deck Name</label><label>Guns</label><label>Caliber</label><label>Type</label><label></label></div>
-    <div id="as-decks"></div>
-    <button class="btn btn-ghost btn-sm" onclick="asAddDeck()" style="margin-top:4px">+ Add Gun Deck</button>
-
-    <div class="section-label" style="margin-top:14px">Broadside Dice <span style="font-size:0.72rem;color:var(--text-muted);font-weight:400">(adjust as needed)</span></div>
-    <div id="as-broad-grid" style="display:flex;flex-wrap:wrap;gap:4px 24px;margin-top:8px"></div>
-
-    <div class="section-label" style="margin-top:14px">Options</div>
-    <div style="display:flex;gap:20px;flex-wrap:wrap">
-      <label class="upgrade-item"><input type="checkbox" id="as-fastsailer"${s.fastSailer?' checked':''}> <span>Fast Sailer</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:6px">(+1 knot, +12% cost)</span></label>
-      <label class="upgrade-item"><input type="checkbox" id="as-swivels"${s.swivels?' checked':''}> <span>Swivel Guns</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:6px">(+15 pts, boarding bonus)</span></label>
-    </div>
-    <div class="form-grid" style="margin-top:10px">
-      <div class="form-row"><label>Bow Chaser</label><select id="as-bow">
-        <option value=""${!s.bowChaser?' selected':''}>None</option>
-        ${['L','M','H','LC','C','HC'].map(v=>`<option value="${v}"${s.bowChaser===v?' selected':''}>${CHASER_LABELS[v]}</option>`).join('')}
-      </select></div>
-      <div class="form-row"><label>Stern Chaser</label><select id="as-stern">
-        <option value=""${!s.sternChaser?' selected':''}>None</option>
-        ${['L','M','H','LC','C','HC'].map(v=>`<option value="${v}"${s.sternChaser===v?' selected':''}>${CHASER_LABELS[v]}</option>`).join('')}
-      </select></div>
-    </div>
 
     <div class="form-grid">
       <div class="form-row"><label>Location</label><select id="sf-location">${ZONES.map(z=>`<option${s.location===z?' selected':''}>${z}</option>`).join('')}</select></div>
@@ -4321,9 +4284,11 @@ function shipFormHtml(s) {
         <option value="inshoreScout"${s.role==='inshoreScout'?' selected':''}>Inshore Scout (+1)</option>
         <option value="squadronScreen"${s.role==='squadronScreen'?' selected':''}>Squadron Screen (−1)</option>
       </select></div>
-      <div class="form-row"><label>Status</label><select id="sf-status" onchange="onShipStatusChange()">${STATUSES.map(st=>`<option${s.status===st?' selected':''}>${st}</option>`).join('')}</select></div>
     </div>
-    <div class="form-row"><label>Battles Without Striking</label><input type="number" id="sf-battles" value="${s.battlesWithoutStriking||0}" min="0"></div>
+    <div class="form-grid">
+      <div class="form-row"><label>Status</label><select id="sf-status" onchange="onShipStatusChange()">${STATUSES.map(st=>`<option${s.status===st?' selected':''}>${st}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Battles Without Striking</label><input type="number" id="sf-battles" value="${s.battlesWithoutStriking||0}" min="0"></div>
+    </div>
     <div class="form-row"><label>Officer Assigned</label><select id="sf-officer">${officerOpts}</select></div>
     ${s.status === 'repairing' ? `
     <div class="form-row"><label>Repair Port</label><select id="sf-repairPort" onchange="recalcRepairCost()">${repairPortOpts}</select></div>
@@ -4360,17 +4325,10 @@ function shipFormHtml(s) {
           }).join('')}
       </select></div>
     </div>
-    <input type="hidden" id="sf-player" value="${s.player||''}">
-    ${(s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction)) ? `
-    <div class="form-row"><label>Merchant Nation</label><select id="sf-merchantFaction">
-      <option value="Merchant"${(!s.faction||s.faction==='Merchant')?' selected':''}>— Unspecified —</option>
-      ${MERCHANT_FACTIONS.filter(f=>f!=='Other').map(f=>`<option value="${f}"${s.faction===f?' selected':''}>${FACTION_FLAG[f]||''} ${f}</option>`).join('')}
-      <option value="Other"${s.faction==='Other'?' selected':''}>Other</option>
-    </select></div>` : '<span id="sf-merchantFaction" style="display:none"></span>'}
     <div class="section-label" style="margin-top:14px">Persistent Damage</div>
     <input type="hidden" id="sf-structDamage" value="${JSON.stringify(s.structuralDamage||[])}">
     <div style="margin-bottom:8px">
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">Structural Damage <span style="color:var(--red)">(10 resources each — major port only)</span></div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">Structural Damage <span style="color:var(--red)">(10 res at major port · 20 res at secondary port)</span></div>
       <div id="sf-structDamage-list" style="margin-bottom:6px"></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-ghost btn-sm" onclick="addStructDamage('mast','Mizzen')">+ Mizzen Mast</button>
@@ -4380,14 +4338,59 @@ function shipFormHtml(s) {
       </div>
     </div>
     <div style="margin-bottom:8px">
-      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">Crew Hits <span style="color:var(--text-muted)">(2 hits reduces crew level until major port)</span></div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px">Crew Hits <span style="color:var(--text-muted)">(each 2 hits reduces crew level until visit to port)</span></div>
       <div style="display:flex;align-items:center;gap:10px">
         <button class="res-adj" onclick="adjCrewHits(-1)">−</button>
         <input type="number" id="sf-crewHits" value="${s.crewHits||0}" min="0" max="9" style="width:60px;text-align:center">
         <button class="res-adj" onclick="adjCrewHits(1)">+</button>
       </div>
     </div>
-    <div class="form-row"><label>Notes</label><textarea id="sf-notes" rows="2">${s.notes||''}</textarea></div>`;
+    <div class="form-row"><label>Notes</label><textarea id="sf-notes" rows="2">${s.notes||''}</textarea></div>
+
+    <div class="section-label" style="margin-top:18px;cursor:pointer;user-select:none" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.querySelector('.sf-toggle').textContent=this.nextElementSibling.style.display==='none'?'▶':'▼'">Ship Specification <span class="sf-toggle" style="font-size:0.75rem;color:var(--text-muted)">▶</span></div>
+    <div style="display:none">
+      <div class="form-grid">
+        <div class="form-row"><label>Type</label><select id="sf-type">${['', ...SHIP_TYPES].map(t=>`<option value="${t}"${s.type===t?' selected':''}>${t||'— select type —'}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Cost (resources)</label><input type="number" id="sf-cost" value="${s.cost||0}"></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>Rig</label><select id="sf-rig">
+          ${['Square','Fore and Aft','Lateen'].map(r=>`<option value="${r}"${(s.rig||_defaultRig(s.type))===r?' selected':''}>${r}</option>`).join('')}
+        </select></div>
+      </div>
+      <div class="form-grid">
+        <div class="form-row"><label>SP Current</label><input type="number" id="sf-spCurrent" value="${s.spCurrent||0}" min="0" oninput="recalcRepairCost()"></div>
+        <div class="form-row"><label>SP Max</label><input type="number" id="sf-spMax" value="${s.spMax||0}" min="1" oninput="recalcRepairCost()"></div>
+      </div>
+      <div class="section-label" style="margin-top:14px">Armament</div>
+      <div class="deck-header"><label>Deck Name</label><label>Guns</label><label>Caliber</label><label>Type</label><label></label></div>
+      <div id="as-decks"></div>
+      <button class="btn btn-ghost btn-sm" onclick="asAddDeck()" style="margin-top:4px">+ Add Gun Deck</button>
+      <div class="section-label" style="margin-top:14px">Broadside Dice <span style="font-size:0.72rem;color:var(--text-muted);font-weight:400">(adjust as needed)</span></div>
+      <div id="as-broad-grid" style="display:flex;flex-wrap:wrap;gap:4px 24px;margin-top:8px"></div>
+      <div class="section-label" style="margin-top:14px">Options</div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap">
+        <label class="upgrade-item"><input type="checkbox" id="as-fastsailer"${s.fastSailer?' checked':''}> <span>Fast Sailer</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:6px">(+1 knot, +12% cost)</span></label>
+        <label class="upgrade-item"><input type="checkbox" id="as-swivels"${s.swivels?' checked':''}> <span>Swivel Guns</span><span style="color:var(--text-muted);font-size:0.72rem;margin-left:6px">(+15 pts, boarding bonus)</span></label>
+      </div>
+      <div class="form-grid" style="margin-top:10px">
+        <div class="form-row"><label>Bow Chaser</label><select id="as-bow">
+          <option value=""${!s.bowChaser?' selected':''}>None</option>
+          ${['L','M','H','LC','C','HC'].map(v=>`<option value="${v}"${s.bowChaser===v?' selected':''}>${CHASER_LABELS[v]}</option>`).join('')}
+        </select></div>
+        <div class="form-row"><label>Stern Chaser</label><select id="as-stern">
+          <option value=""${!s.sternChaser?' selected':''}>None</option>
+          ${['L','M','H','LC','C','HC'].map(v=>`<option value="${v}"${s.sternChaser===v?' selected':''}>${CHASER_LABELS[v]}</option>`).join('')}
+        </select></div>
+      </div>
+    </div>
+    <input type="hidden" id="sf-player" value="${s.player||''}">
+    ${(s.faction === 'Merchant' || MERCHANT_FACTIONS.includes(s.faction)) ? `
+    <div class="form-row"><label>Merchant Nation</label><select id="sf-merchantFaction">
+      <option value="Merchant"${(!s.faction||s.faction==='Merchant')?' selected':''}>— Unspecified —</option>
+      ${MERCHANT_FACTIONS.filter(f=>f!=='Other').map(f=>`<option value="${f}"${s.faction===f?' selected':''}>${FACTION_FLAG[f]||''} ${f}</option>`).join('')}
+      <option value="Other"${s.faction==='Other'?' selected':''}>Other</option>
+    </select></div>` : '<span id="sf-merchantFaction" style="display:none"></span>'}`;
 }
 
 function readShipForm(existing) {
@@ -4993,18 +4996,9 @@ window.openAddShip = function(playerId, faction) {
     </div>
 
     <div class="form-row"><label>Ship Name</label><input id="as-name" placeholder="e.g. HMS Badger"></div>
-    <div class="form-grid">
-      <div class="form-row"><label>Type</label><select id="as-type" onchange="asTypeChange()">${['',...SHIP_TYPES].map(t=>`<option value="${t}">${t||'— select type —'}</option>`).join('')}</select></div>
-      <div class="form-row"><label>Crew Level</label><select id="as-crew" onchange="asCalc()">${CREW_LEVELS.map(c=>`<option${c==='Regular'?' selected':''}>${c}</option>`).join('')}</select></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>Total Guns</label><input type="number" id="as-guns" value="0" min="0" max="120" readonly style="opacity:0.6;cursor:default" title="Auto-calculated from armament table"></div>
-      <div class="form-row"><label>Cost (resources)</label><input type="number" id="as-cost" value="0"></div>
-    </div>
-    <div class="form-grid">
-      <div class="form-row"><label>SP Current</label><input type="number" id="as-spCurrent" value="0" min="0"></div>
-      <div class="form-row"><label>SP Max</label><input type="number" id="as-spMax" value="0" min="1"></div>
-    </div>
+    <div class="form-row"><label>Location</label><select id="as-location">${ZONES.map(z=>`<option>${z}</option>`).join('')}</select></div>
+
+    <div class="form-row"><label>Type</label><select id="as-type" onchange="asTypeChange()">${['',...SHIP_TYPES].map(t=>`<option value="${t}">${t||'— select type —'}</option>`).join('')}</select></div>
 
     <div class="section-label" style="margin-top:14px">Armament</div>
     <div class="deck-header"><label>Deck Name</label><label>Guns</label><label>Caliber</label><label>Type</label><label></label></div>
@@ -5030,19 +5024,25 @@ window.openAddShip = function(playerId, faction) {
       </select></div>
     </div>
 
-    <div class="section-label" style="margin-top:14px">Campaign Details</div>
-    <div class="form-grid">
-      <div class="form-row"><label>Location</label><select id="as-location">${ZONES.map(z=>`<option>${z}</option>`).join('')}</select></div>
-      ${playerId === 'merchant' ? `<div class="form-row"><label>Nation</label><select id="as-merchant-faction"><option value="Merchant">Merchant (generic)</option>${MERCHANT_FACTIONS.map(f=>`<option value="${f}">${f}</option>`).join('')}</select></div>` : `<div class="form-row"><label>Squadron</label><select id="as-squadron"><option value="">— None —</option>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l=>`<option value="${l}">${l}</option>`).join('')}</select></div>`}
+    <div class="form-grid" style="margin-top:10px">
+      <div class="form-row"><label>Cost (resources)</label><input type="number" id="as-cost" value="0" readonly style="opacity:0.6;cursor:default"></div>
+      <div class="form-row"><label>SP Max</label><input type="number" id="as-spMax" value="0" min="1" readonly style="opacity:0.6;cursor:default"></div>
     </div>
-    <div class="form-row"><label>Status</label><select id="as-status">${STATUSES.map(st=>`<option${st==='active'?' selected':''}>${st}</option>`).join('')}</select></div>
-    <div class="form-row"><label>Officer Assigned</label><select id="as-officer">${officerOpts}</select></div>
-    <div class="form-grid">
-      <div class="form-row"><label>Repair Port</label><select id="as-repairPort">${repairPortOpts}</select></div>
-      <div class="form-row"><label>Repair Cost Paid</label><input type="number" id="as-repairCost" value="0"></div>
+    <div style="display:none">
+      <input type="number" id="as-guns" value="0">
+      <select id="as-crew" onchange="asCalc()">${CREW_LEVELS.map(c=>`<option${c==='Inexperienced'?' selected':''}>${c}</option>`).join('')}</select>
+      <input type="number" id="as-spCurrent" value="0" min="0">
     </div>
-    <div class="form-row"><label>Available in Turn</label><input id="as-available" value=""></div>
-    <div class="form-row"><label>Notes</label><textarea id="as-notes" rows="2"></textarea></div>
+
+    <div style="display:none">
+      ${playerId === 'merchant' ? `<select id="as-merchant-faction"><option value="Merchant">Merchant (generic)</option>${MERCHANT_FACTIONS.map(f=>`<option value="${f}">${f}</option>`).join('')}</select>` : `<select id="as-squadron"><option value="">— None —</option>${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(l=>`<option value="${l}">${l}</option>`).join('')}</select>`}
+      <select id="as-status">${STATUSES.map(st=>`<option${st==='active'?' selected':''}>${st}</option>`).join('')}</select>
+      <select id="as-officer">${officerOpts}</select>
+      <select id="as-repairPort">${repairPortOpts}</select>
+      <input type="number" id="as-repairCost" value="0">
+      <input id="as-available" value="">
+      <textarea id="as-notes" rows="2"></textarea>
+    </div>
 
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
