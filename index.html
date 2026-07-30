@@ -1377,7 +1377,7 @@ function shipCard(id, s) {
         const costPaid = s.repairCostPaid || 0;
         const refundNote = costPaid > 0 ? ` (${costPaid} res refunded)` : '';
         return `<div style="border-top:1px solid var(--border);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span style="font-size:0.78rem;color:var(--text-muted)">🔧 Repairing at ${s.repairPort||'port'} · ${s.availableIn||'unknown'}</span>
+          <span style="font-size:0.78rem;color:var(--text-muted)">🔧 Repairing at ${s.repairPort||'port'} · ${s.availableIn||`Turn ${currentTurn + 1}`}</span>
           <button class="btn btn-sm" style="background:rgba(180,60,60,0.12);color:#c05050;border-color:#c05050" onclick="cancelRepair('${id}')">✕ Cancel${refundNote}</button>
         </div>`;
       }
