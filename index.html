@@ -3542,11 +3542,11 @@ window.openCampaignModal = function() {
       <button class="btn btn-sm" onclick="campaignCreate()">Create</button>
     </div>
 
-    <div class="section-label" style="margin-top:12px">Clone From Another Campaign</div>
-    <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 8px">Copy all data from another campaign into <strong>${campaignId}</strong>.</p>
+    <div class="section-label" style="margin-top:12px">Duplicate This Campaign</div>
+    <p style="font-size:0.82rem;color:var(--text-muted);margin:4px 0 8px">Copy all data to a new URL — useful for migrating to a different campaign link.</p>
     <div style="display:flex;gap:8px;margin-bottom:8px">
-      <input id="cm-clone-src" placeholder="Source campaign ID (e.g. default)" style="flex:1">
-      <button class="btn btn-sm" onclick="campaignClone()">Clone</button>
+      <input id="cm-dup-name" placeholder="New campaign name (e.g. Atlantic 1803)" style="flex:1">
+      <button class="btn btn-sm" onclick="campaignDuplicate()">Duplicate</button>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:4px">
@@ -3569,17 +3569,18 @@ window.copyCampaignUrl = function() {
   });
 };
 
-window.campaignClone = async function() {
-  const src = document.getElementById('cm-clone-src').value.trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
-  if (!src) { showToast('Enter a source campaign ID'); return; }
-  if (src === campaignId) { showToast('Source and destination are the same'); return; }
-  if (!confirm(`Copy all data from "${src}" into "${campaignId}"?\n\nThis will overwrite everything in the current campaign.`)) return;
-  showToast('Cloning…');
-  const srcSnap = await get(ref(db, `/campaigns/${src}`));
-  if (!srcSnap.exists()) { showToast(`Campaign "${src}" not found`); return; }
-  await set(ref(db, `/campaigns/${campaignId}`), srcSnap.val());
-  showToast(`Cloned from "${src}" — reloading…`);
-  setTimeout(() => location.reload(), 1200);
+window.campaignDuplicate = async function() {
+  const name = document.getElementById('cm-dup-name').value.trim();
+  if (!name) { showToast('Enter a name for the new campaign'); return; }
+  const newId = _generateCampaignId(name);
+  const newUrl = `${location.origin}${location.pathname}#${newId}`;
+  if (!confirm(`Duplicate "${campaignId}" to a new campaign?\n\nNew URL:\n${newUrl}\n\nAll current data will be copied across.`)) return;
+  showToast('Duplicating…');
+  const srcSnap = await get(ref(db, `/campaigns/${campaignId}`));
+  if (!srcSnap.exists()) { showToast('No data found to duplicate'); return; }
+  await set(ref(db, `/campaigns/${newId}`), srcSnap.val());
+  showToast('Duplicated — opening new campaign…');
+  setTimeout(() => { location.href = newUrl; }, 1200);
 };
 
 window.noCampaignGo = async function() {
