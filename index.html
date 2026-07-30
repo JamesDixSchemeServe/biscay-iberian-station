@@ -932,14 +932,20 @@ function renderPlayer(pid) {
   const favClass = p.admiraltyFavour > 0 ? 'fav-pos' : p.admiraltyFavour < 0 ? 'fav-neg' : 'fav-zero';
   const favLabel = p.admiraltyFavour > 0 ? `+${p.admiraltyFavour}` : `${p.admiraltyFavour}`;
   const favour = p.admiraltyFavour || 0;
+  const currTurn = (appData.meta||{}).turn||1;
   const isPostCaptain = (p.rank || _ranksForFaction(p.faction)[0]) === _ranksForFaction(p.faction)[1];
-  const perks = [];
-  if (isPostCaptain) perks.push('Reroll one Skill Test per turn');
-  if (favour >= 2) perks.push('Reroll one Skill Test once per battle');
-  if (favour >= 1) perks.push(p.favourRepairUsedTurn === ((appData.meta||{}).turn||1) ? 'Half-cost repair ✓ used' : 'Half-cost repair available');
-  if (favour >= 2) perks.push(p.favourSpeedUsedTurn === ((appData.meta||{}).turn||1) ? 'Repair 1 turn faster ✓ used' : 'Repair 1 turn faster available');
-  if (favour <= -2) perks.push('⚠ Loss of Confidence');
-  else if (favour === -1) perks.push('⚠ Under Scrutiny — promotions blocked');
+  const captainPerks = [];
+  if (isPostCaptain) captainPerks.push('Reroll one Skill Test per turn');
+  const favourBenefits = [];
+  if (favour >= 1) favourBenefits.push(p.favourRepairUsedTurn === currTurn ? 'Half-cost repair ✓ used' : 'Half-cost repair available');
+  if (favour >= 2) favourBenefits.push('Reroll one Skill Test once per battle');
+  if (favour >= 2) favourBenefits.push(p.favourSpeedUsedTurn === currTurn ? 'Repair 1 turn faster ✓ used' : 'Repair 1 turn faster available');
+  const favourWarnings = [];
+  if (favour <= -2) { const dt = p.disfavourTurns || 1; favourWarnings.push(`⚠ Loss of Confidence (${dt} turn${dt !== 1 ? 's' : ''})`); }
+  else if (favour === -1) favourWarnings.push('⚠ Under Scrutiny — promotions blocked');
+
+  const perkBoxStyle = 'flex:1;min-width:120px;border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:var(--surface2)';
+  const perkLabelStyle = 'font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px';
 
   let html = `<div class="player-row" style="grid-template-columns:1fr">
     <div class="player-card" onclick="showPlayerModal('${pid}')" style="display:flex;gap:14px;align-items:flex-start">
@@ -951,7 +957,10 @@ function renderPlayer(pid) {
           <div><div class="res">${p.resources} <span style="font-size:0.7rem;color:var(--text-muted)">resources</span></div></div>
           <div><div class="res"><span class="favour-val ${favClass}">${favLabel}</span> <span style="font-size:0.7rem;color:var(--text-muted)">admiralty favour</span></div></div>
         </div>
-        ${perks.length ? `<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${perks.map(pk => `<span class="tag" style="font-size:0.7rem">${pk}</span>`).join('')}</div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <div style="${perkBoxStyle}"><div style="${perkLabelStyle}">Commander Perk</div>${captainPerks.length ? captainPerks.map(pk=>`<div style="font-size:0.72rem">${pk}</div>`).join('') : `<div style="font-size:0.72rem;color:var(--text-muted)">None</div>`}</div>
+          <div style="${perkBoxStyle}${favourWarnings.length ? ';border-color:var(--red)' : favourBenefits.length ? ';border-color:rgba(90,158,62,0.4)' : ''}"><div style="${perkLabelStyle}">Admiralty Favour</div>${favourBenefits.map(pk=>`<div style="font-size:0.72rem;color:#5a9e3e">${pk}</div>`).join('')}${favourWarnings.map(pk=>`<div style="font-size:0.72rem;color:var(--red)">${pk}</div>`).join('')}${!favourBenefits.length && !favourWarnings.length ? `<div style="font-size:0.72rem;color:var(--text-muted)">None</div>` : ''}</div>
+        </div>
       </div>
     </div>
   </div>`;
