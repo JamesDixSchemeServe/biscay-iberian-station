@@ -5142,7 +5142,7 @@ window.saveNewShip = async function() {
   if (!isMerchantShip) {
     updates[`/players/${_asPlayerId}/resources`]=currentRes-cost;
     // Recruiting 1/2nd Rate at +2 costs 1 Admiralty Favour
-    const rCat = _shipRateCategory(shipType);
+    const rCat = _shipRateCategory(document.getElementById('as-type').value);
     if (rCat === 'line') {
       const player = (appData.players || {})[_asPlayerId];
       const curFavour = player ? (player.admiraltyFavour || 0) : 0;
