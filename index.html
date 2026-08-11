@@ -1888,13 +1888,13 @@ const MAP_PORT_POS = {
 };
 // Zone sea-area spread slots — positions verified to be in open water on the map image
 const MAP_ZONE_SLOTS = {
-  'Zone 1': [{x:32,y:12},{x:42,y:8},{x:52,y:16},{x:36,y:20},{x:26,y:16},{x:48,y:22},{x:22,y:22},{x:56,y:22}],
-  'Zone 2': [{x:52,y:26},{x:58,y:32},{x:46,y:32},{x:62,y:38},{x:44,y:38},{x:55,y:42},{x:40,y:44},{x:64,y:44}],
-  'Zone 3': [{x:52,y:44},{x:58,y:47},{x:46,y:46},{x:62,y:44},{x:43,y:48},{x:66,y:47},{x:56,y:50},{x:40,y:50}],
-  'Zone 4': [{x:14,y:52},{x:8,y:56},{x:20,y:58},{x:6,y:62},{x:16,y:64},{x:24,y:60},{x:4,y:68},{x:22,y:66}],
-  'Zone 5': [{x:8,y:68},{x:4,y:74},{x:12,y:76},{x:5,y:82},{x:14,y:82},{x:2,y:80},{x:10,y:86},{x:16,y:76}],
-  'Zone 6': [{x:10,y:84},{x:4,y:88},{x:16,y:88},{x:6,y:92},{x:20,y:86},{x:2,y:84},{x:14,y:92},{x:24,y:90}],
-  'Zone 7': [{x:55,y:91},{x:62,y:88},{x:68,y:93},{x:58,y:85},{x:65,y:95},{x:72,y:89},{x:60,y:97},{x:70,y:84}],
+  'Zone 1': [{x:20,y:10},{x:34,y:8},{x:46,y:14},{x:28,y:18},{x:14,y:16},{x:40,y:20},{x:8,y:12},{x:52,y:10}],
+  'Zone 2': [{x:48,y:28},{x:55,y:34},{x:42,y:32},{x:60,y:36},{x:36,y:34},{x:52,y:40},{x:44,y:42},{x:58,y:42}],
+  'Zone 3': [{x:50,y:44},{x:56,y:46},{x:44,y:42},{x:62,y:44},{x:38,y:40},{x:64,y:48},{x:48,y:48},{x:58,y:50}],
+  'Zone 4': [{x:10,y:52},{x:5,y:58},{x:16,y:56},{x:3,y:64},{x:10,y:62},{x:6,y:68},{x:2,y:56},{x:14,y:66}],
+  'Zone 5': [{x:6,y:68},{x:2,y:74},{x:10,y:72},{x:3,y:80},{x:8,y:78},{x:2,y:82},{x:6,y:76},{x:12,y:74}],
+  'Zone 6': [{x:8,y:86},{x:3,y:90},{x:14,y:88},{x:4,y:94},{x:10,y:92},{x:2,y:84},{x:16,y:92},{x:6,y:96}],
+  'Zone 7': [{x:58,y:92},{x:64,y:94},{x:70,y:92},{x:62,y:96},{x:68,y:96},{x:74,y:94},{x:60,y:98},{x:76,y:96}],
 };
 
 // ─── MOVEMENT HELPERS ────────────────────────────────────────────────────────
@@ -1950,48 +1950,49 @@ function renderMap() {
   const players = appData.players || {};
   const FC = { British:'#c73535', French:'#2255a8', Spanish:'#8822a0' };
 
-  // Exclude sunk/lost ships
+  // Exclude sunk/lost/sold and pending-repair ships; exclude inshore/screen roles
   const activeShips = Object.entries(ships).filter(([,s]) =>
     s.location && s.status !== 'sunk' && s.status !== 'lost' && s.status !== 'captured' && s.status !== 'sold'
     && !(s.status === 'repairing' && (s.pendingRepairAuth || s.pendingRepair))
     && s.role !== 'inshoreScout' && s.role !== 'squadronScreen'
   );
 
-  // Group into squadrons: key = location|playerId|squadron
-  // Repairing ships always appear at their repairPort
-  const groups = {};
+  // Port groups: one bubble per port, all ships in that port combined
+  // Zone groups: one bubble per player+squadron at sea
+  const portGroups = {};
+  const zoneGroups = {};
+
   activeShips.forEach(([id, s]) => {
     const effectiveLoc = (s.status === 'repairing' && s.repairPort) ? s.repairPort : s.location;
-    const sqn = s.squadron || '';
-    const key = `${effectiveLoc}|||${s.player}|||${sqn}`;
-    if (!groups[key]) groups[key] = { location: effectiveLoc, playerId: s.player, faction: s.faction, squadron: sqn, ships: [], escortKey: null };
-    groups[key].ships.push({id, ...s});
-    if (s.escortedBy) groups[key].escortKey = s.escortedBy;
-  });
-
-  // Find naval groups that are actively escorting a convoy — suppress their own bubble
-  const suppressedKeys = new Set();
-  Object.entries(groups).forEach(([merchantKey, grp]) => {
-    if (!grp.escortKey) return;
-    const [escPlayerId, escSqn] = grp.escortKey.split('|||');
-    // Try exact location match first, then search all locations for this player+squadron
-    const exactKey = `${grp.location}|||${escPlayerId}|||${escSqn||''}`;
-    const navalKey = groups[exactKey]
-      ? exactKey
-      : Object.keys(groups).find(k => {
-          const [, pid, sqn] = k.split('|||');
-          return pid === escPlayerId && sqn === (escSqn||'');
-        });
-    if (navalKey && groups[navalKey]) {
-      suppressedKeys.add(navalKey);
-      grp.escortShips = groups[navalKey].ships;
-      grp.escortFaction = groups[navalKey].faction;
-      grp.escortPlayerId = escPlayerId;
-      grp.escortSqn = escSqn;
+    if (MAP_PORT_POS[effectiveLoc]) {
+      if (!portGroups[effectiveLoc]) portGroups[effectiveLoc] = { ships: [] };
+      portGroups[effectiveLoc].ships.push({id, ...s});
+    } else {
+      const sqn = s.squadron || '';
+      const key = `${effectiveLoc}|||${s.player}|||${sqn}`;
+      if (!zoneGroups[key]) zoneGroups[key] = { location: effectiveLoc, playerId: s.player, faction: s.faction, squadron: sqn, ships: [], escortKey: null, escortShips: null, escortFaction: null };
+      zoneGroups[key].ships.push({id, ...s});
+      if (s.escortedBy) zoneGroups[key].escortKey = s.escortedBy;
     }
   });
 
-  // Simple overlap nudge: push down (or up for bottom-edge ports) until clear
+  // Suppress zone naval groups that are escorting a zone convoy
+  const suppressedKeys = new Set();
+  Object.values(zoneGroups).forEach(grp => {
+    if (!grp.escortKey) return;
+    const [escPlayerId, escSqn] = grp.escortKey.split('|||');
+    const navalKey = Object.keys(zoneGroups).find(k => {
+      const [, pid, sqn] = k.split('|||');
+      return pid === escPlayerId && sqn === (escSqn||'');
+    });
+    if (navalKey && zoneGroups[navalKey]) {
+      suppressedKeys.add(navalKey);
+      grp.escortShips = zoneGroups[navalKey].ships;
+      grp.escortFaction = zoneGroups[navalKey].faction;
+    }
+  });
+
+  // Overlap nudge for zone bubbles only (ports are always at exact position)
   const placed = [];
   function findClear(x, y, goUp) {
     const DX = 9, DY = 5;
@@ -2003,33 +2004,37 @@ function renderMap() {
     return {x, y};
   }
 
-  const bubbles = [];
+  // Port bubbles — one per port, always at exact port anchor position
+  const portBubbleHtml = Object.entries(portGroups).map(([portName, grp]) => {
+    const portPos = MAP_PORT_POS[portName];
+    const portStatic = MAP_PORTS_STATIC.find(p => p.name === portName);
+    const col = FC[portStatic?.fac] || '#555';
+    const hasRepair = grp.ships.some(s => s.status === 'repairing');
+    const statusIcon = hasRepair ? ' ⚓' : '';
+    const encodedPort = encodeURIComponent(portName);
+    const abovePin = portPos.y > 70;
+    return `<div onclick="mapPortClick('${encodedPort}')"
+      style="position:absolute;left:clamp(8%,${portPos.x}%,92%);top:${portPos.y}%;transform:translate(-50%,${abovePin ? '-100%' : '0'});
+             background:${col};color:white;border:2px solid rgba(255,255,255,0.55);border-radius:16px;
+             padding:5px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;white-space:nowrap;
+             box-shadow:0 1px 3px rgba(0,0,0,0.3);z-index:10;line-height:1.6;opacity:0.9;
+             min-height:36px;display:flex;align-items:center;gap:3px;touch-action:manipulation">
+      ${portName} <span style="opacity:0.75;font-weight:400">(${grp.ships.length})</span>${statusIcon}
+    </div>`;
+  }).join('');
+
+  // Zone bubbles — one per player+squadron at sea, using pre-set slot positions (no nudge)
   const locCounters = {};
-
-  Object.values(groups).forEach(grp => {
-    if (suppressedKeys.has(`${grp.location}|||${grp.playerId}|||${grp.squadron}`)) return;
-
+  const zoneBubbleHtml = Object.values(zoneGroups).filter(grp =>
+    !suppressedKeys.has(`${grp.location}|||${grp.playerId}|||${grp.squadron}`)
+  ).map(grp => {
     const loc = grp.location;
     const isMerchant = grp.faction === 'Merchant' || MERCHANT_FACTIONS.includes(grp.faction) || grp.playerId === 'merchant';
-
     const idx = locCounters[loc] = (locCounters[loc] || 0);
     locCounters[loc]++;
-    let startX, startY, atPort, goUp = false;
-    const portPos = MAP_PORT_POS[loc];
-    if (portPos) {
-      goUp = portPos.y > 75;
-      startX = portPos.x + (idx % 2 === 0 ? -3 : 3);
-      startY = portPos.y + (goUp ? -1 : 1) * Math.floor(idx / 2) * 5;
-      atPort = true;
-    } else {
-      const slots = MAP_ZONE_SLOTS[loc] || [];
-      const pos = slots[idx % slots.length] || { x: 30, y: 50 };
-      startX = pos.x; startY = pos.y; atPort = false;
-      goUp = startY > 75;
-    }
-    const resolved = findClear(startX, startY, goUp);
-    const x = resolved.x, y = resolved.y;
-
+    const slots = MAP_ZONE_SLOTS[loc] || [];
+    const pos = slots[idx % slots.length] || { x: 30, y: 50 };
+    const { x, y } = pos;
     const p = players[grp.playerId] || {};
     const playerShort = (p.name || grp.playerId || '?').slice(0, 8);
     const sqnLabel = grp.squadron ? ` ${grp.squadron}` : '';
@@ -2037,27 +2042,16 @@ function renderMap() {
     const col = isMerchant ? '#7a6030' : (FC[grp.faction] || '#555');
     const flag = FACTION_FLAG[grp.faction] || '';
     const totalCount = grp.ships.length + (grp.escortShips ? grp.escortShips.length : 0);
-    const hasRepair = grp.ships.some(s => s.status === 'repairing');
-    const hasDamaged = grp.ships.some(s => s.spCurrent < s.spMax * 0.5);
-    const statusIcon = hasRepair ? ' ⚓' : hasDamaged ? ' ⚡' : '';
-    // Ring colour: escort faction if escorted, white otherwise
-    const ringCol = grp.escortFaction ? (FC[grp.escortFaction] || 'white') : (atPort ? 'rgba(255,255,255,0.55)' : 'white');
-
+    const statusIcon = grp.ships.some(s => s.status === 'repairing') ? ' ⚓' : grp.ships.some(s => s.spCurrent < s.spMax * 0.5) ? ' ⚡' : '';
+    const ringCol = grp.escortFaction ? (FC[grp.escortFaction] || 'white') : 'white';
     const encodedKey = encodeURIComponent(`${grp.location}|||${grp.playerId}|||${grp.squadron}`);
-    bubbles.push({ x, y, atPort, col, label, flag, totalCount, statusIcon, encodedKey, ringCol });
-  });
-
-  const bubbleHtml = bubbles.map(b => {
-    const shadow = b.atPort ? '0 1px 3px rgba(0,0,0,0.3)' : '0 2px 6px rgba(0,0,0,0.45)';
-    const opacity = b.atPort ? 0.85 : 1;
-    const transform = b.atPort ? 'translate(-50%,0)' : 'translate(-50%,-50%)';
-    return `<div onclick="mapGroupClick('${b.encodedKey}')"
-      style="position:absolute;left:${b.x}%;top:${b.y}%;transform:${transform};
-             background:${b.col};color:white;border:3px solid ${b.ringCol};border-radius:16px;
-             padding:5px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;
-             white-space:nowrap;box-shadow:${shadow};z-index:10;line-height:1.6;opacity:${opacity};
+    return `<div onclick="mapGroupClick('${encodedKey}')"
+      style="position:absolute;left:clamp(8%,${x}%,92%);top:clamp(5%,${y}%,95%);transform:translate(-50%,-50%);
+             background:${col};color:white;border:3px solid ${ringCol};border-radius:16px;
+             padding:5px 10px;font-size:0.7rem;font-weight:700;cursor:pointer;white-space:nowrap;
+             box-shadow:0 2px 6px rgba(0,0,0,0.45);z-index:10;line-height:1.6;
              min-height:36px;display:flex;align-items:center;gap:3px;touch-action:manipulation">
-      ${b.flag} ${b.label} <span style="opacity:0.75;font-weight:400">(${b.totalCount})</span>${b.statusIcon}
+      ${flag} ${label} <span style="opacity:0.75;font-weight:400">(${totalCount})</span>${statusIcon}
     </div>`;
   }).join('');
 
@@ -2080,7 +2074,8 @@ function renderMap() {
   return `<div style="position:relative;max-width:663px;margin:0 auto;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#7aa8c0">
     <img src="MAP.jpg" style="width:100%;display:block;vertical-align:bottom"
          onerror="this.style.opacity='0.15'">
-    ${bubbleHtml}
+    ${portBubbleHtml}
+    ${zoneBubbleHtml}
     <div style="position:absolute;bottom:6px;right:8px;display:flex;gap:6px;opacity:0.85">
       ${Object.entries(FC).map(([f,c])=>`<span style="background:${c};color:white;font-size:0.6rem;font-weight:700;padding:2px 6px;border-radius:10px;border:1px solid white">${f}</span>`).join('')}
     </div>
@@ -2162,6 +2157,62 @@ window.mapGroupClick = function(encodedKey) {
       <button class="btn btn-ghost" onclick="openMoveSquadron('${encodeURIComponent(`${loc}|||${playerId}|||${squadron}`)}')">⛵ Move</button>
       <button class="btn" onclick="closeModal();showTab('${playerId}')">Go to Player</button>
     </div>`);
+};
+
+window.mapPortClick = function(encodedPort) {
+  const portName = decodeURIComponent(encodedPort);
+  const ships = appData.ships || {};
+  const players = appData.players || {};
+  const portStatic = MAP_PORTS_STATIC.find(p => p.name === portName);
+  const portLabel = portStatic ? (portStatic.major ? 'Major Port' : 'Secondary Port') : 'Port';
+
+  // All active ships at this port (by effective location)
+  const portShips = Object.entries(ships).filter(([,s]) => {
+    const effectiveLoc = (s.status === 'repairing' && s.repairPort) ? s.repairPort : s.location;
+    return effectiveLoc === portName && s.status !== 'sunk' && s.status !== 'lost' && s.status !== 'captured';
+  });
+
+  // Group by player+squadron
+  const groups = {};
+  portShips.forEach(([id, s]) => {
+    const sqn = s.squadron || '';
+    const key = `${s.player}|||${sqn}`;
+    if (!groups[key]) groups[key] = { playerId: s.player, squadron: sqn, ships: [] };
+    groups[key].ships.push([id, s]);
+  });
+
+  function shipRow([id, s]) {
+    const statusBadge = s.status && s.status !== 'active'
+      ? `<span style="color:var(--text-muted);font-size:0.75rem"> (${s.status})</span>` : '';
+    const sp = `<span style="color:var(--text-muted);font-size:0.75rem"> ${s.spCurrent}/${s.spMax} SP</span>`;
+    return `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+      ${s.name}${statusBadge}${sp}
+      <span style="color:var(--text-muted);font-size:0.75rem;margin-left:4px">${s.type||''}</span>
+    </div>`;
+  }
+
+  const groupsHtml = Object.entries(groups).map(([, grp]) => {
+    const p = players[grp.playerId] || {};
+    const flag = FACTION_FLAG[p.faction] || '';
+    const sqnLabel = grp.squadron ? ` — Squadron ${grp.squadron}` : '';
+    const encodedGroupKey = encodeURIComponent(`${portName}|||${grp.playerId}|||${grp.squadron}`);
+    return `<div style="margin-top:10px;padding:10px;background:var(--surface2);border-radius:6px;border:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <strong style="font-size:0.85rem">${flag} ${p.name||grp.playerId}${sqnLabel}</strong>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-ghost" onclick="openMoveSquadron('${encodedGroupKey}')">⛵ Move</button>
+          <button class="btn btn-sm btn-ghost" onclick="closeModal();showTab('${grp.playerId}')">View</button>
+        </div>
+      </div>
+      ${grp.ships.map(shipRow).join('')}
+    </div>`;
+  }).join('');
+
+  showModal(`<button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    <h2>⚓ ${portName}</h2>
+    <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">${portLabel} · ${portShips.length} ship${portShips.length!==1?'s':''}</div>
+    ${groupsHtml || '<div style="color:var(--text-muted);font-size:0.85rem">No ships currently in port.</div>'}
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>`);
 };
 
 // ─── MOVEMENT & INTERCEPTION ─────────────────────────────────────────────────
