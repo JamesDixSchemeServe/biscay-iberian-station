@@ -1894,7 +1894,7 @@ const MAP_ZONE_SLOTS = {
   'Zone 4': [{x:14,y:52},{x:8,y:56},{x:20,y:58},{x:6,y:62},{x:16,y:64},{x:24,y:60},{x:4,y:68},{x:22,y:66}],
   'Zone 5': [{x:8,y:68},{x:4,y:74},{x:12,y:76},{x:5,y:82},{x:14,y:82},{x:2,y:80},{x:10,y:86},{x:16,y:76}],
   'Zone 6': [{x:10,y:84},{x:4,y:88},{x:16,y:88},{x:6,y:92},{x:20,y:86},{x:2,y:84},{x:14,y:92},{x:24,y:90}],
-  'Zone 7': [{x:30,y:92},{x:36,y:93},{x:22,y:92},{x:42,y:92},{x:28,y:95},{x:38,y:95},{x:18,y:94},{x:44,y:94}],
+  'Zone 7': [{x:55,y:91},{x:62,y:88},{x:68,y:93},{x:58,y:85},{x:65,y:95},{x:72,y:89},{x:60,y:97},{x:70,y:84}],
 };
 
 // ─── MOVEMENT HELPERS ────────────────────────────────────────────────────────
@@ -1991,13 +1991,13 @@ function renderMap() {
     }
   });
 
-  // Simple overlap nudge: push down until clear
+  // Simple overlap nudge: push down (or up for bottom-edge ports) until clear
   const placed = [];
-  function findClear(x, y) {
+  function findClear(x, y, goUp) {
     const DX = 9, DY = 5;
     for (let attempt = 0; attempt < 15; attempt++) {
       if (placed.every(p => Math.abs(p.x - x) >= DX || Math.abs(p.y - y) >= DY)) break;
-      y += DY;
+      y += goUp ? -DY : DY;
     }
     placed.push({x, y});
     return {x, y};
@@ -2014,18 +2014,20 @@ function renderMap() {
 
     const idx = locCounters[loc] = (locCounters[loc] || 0);
     locCounters[loc]++;
-    let startX, startY, atPort;
+    let startX, startY, atPort, goUp = false;
     const portPos = MAP_PORT_POS[loc];
     if (portPos) {
+      goUp = portPos.y > 75;
       startX = portPos.x + (idx % 2 === 0 ? -3 : 3);
-      startY = portPos.y + Math.floor(idx / 2) * 5;
+      startY = portPos.y + (goUp ? -1 : 1) * Math.floor(idx / 2) * 5;
       atPort = true;
     } else {
       const slots = MAP_ZONE_SLOTS[loc] || [];
       const pos = slots[idx % slots.length] || { x: 30, y: 50 };
       startX = pos.x; startY = pos.y; atPort = false;
+      goUp = startY > 75;
     }
-    const resolved = findClear(startX, startY);
+    const resolved = findClear(startX, startY, goUp);
     const x = resolved.x, y = resolved.y;
 
     const p = players[grp.playerId] || {};
@@ -2075,7 +2077,7 @@ function renderMap() {
     </div>`;
   }).join('');
 
-  return `<div style="position:relative;max-width:663px;margin:0 auto;border:1px solid var(--border);border-radius:var(--radius);background:#7aa8c0">
+  return `<div style="position:relative;max-width:663px;margin:0 auto;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#7aa8c0">
     <img src="MAP.jpg" style="width:100%;display:block;vertical-align:bottom"
          onerror="this.style.opacity='0.15'">
     ${bubbleHtml}
