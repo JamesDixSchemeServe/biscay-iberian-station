@@ -638,7 +638,7 @@ function renderOverview() {
   </div>`;
   html += `<div class="player-row">`;
   for (const [pid, p] of Object.entries(players)) {
-    const pShips = Object.values(ships).filter(s => s.player === pid && s.status === 'active').length;
+    const pShips = Object.values(ships).filter(s => s.player === pid && ['active','repairing','captured'].includes(s.status)).length;
     const favClass = p.admiraltyFavour > 0 ? 'fav-pos' : p.admiraltyFavour < 0 ? 'fav-neg' : 'fav-zero';
     const favLabel = p.admiraltyFavour > 0 ? `+${p.admiraltyFavour}` : `${p.admiraltyFavour}`;
     const pStatus = p.status || 'active';
