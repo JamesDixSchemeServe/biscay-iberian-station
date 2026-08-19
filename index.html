@@ -3181,16 +3181,13 @@ function renderOrders() {
   const interceptionUsed = Object.keys(meta.interceptionUsed || {}).length > 0;
   const interceptionPending = movementConfirmed && hasContestedZones && !interceptionUsed;
 
-  const warnings = [];
-  if (!movementConfirmed) {
-    const pending = milPlayers.filter(([pid]) => !moveDone[pid]).map(([,p]) => p.name).join(', ');
-    warnings.push(`Movement not yet confirmed by: ${pending}`);
-  }
-  if (interceptionPending) warnings.push('Interception has not been resolved — contested zones exist');
+  const showBanner = !movementConfirmed || interceptionPending;
+  const pending = milPlayers.filter(([pid]) => !moveDone[pid]).map(([,p]) => p.name).join(', ');
 
-  const warningBanner = warnings.length
-    ? `<div style="background:rgba(200,130,30,0.12);border:1px solid #c8821e;border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;display:flex;flex-direction:column;gap:4px">
-        ${warnings.map(w => `<div style="font-size:0.82rem;color:#c8821e">⚠ ${w}</div>`).join('')}
+  const warningBanner = showBanner
+    ? `<div style="background:rgba(200,130,30,0.12);border:1px solid #c8821e;border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px">
+        ${!movementConfirmed ? `<div style="font-size:0.82rem;color:#c8821e;font-weight:600">⚠ Movement not yet confirmed by: ${pending}</div>` : ''}
+        <div style="font-size:0.8rem;color:#c8821e">Complete movement on the Map to unlock Interception — resolve Interception checks to determine which battles occur, then generate your missions below.</div>
        </div>`
     : '';
 
