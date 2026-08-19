@@ -4550,7 +4550,7 @@ window.openEditShip = function(id) {
     <h2>Edit ${s.name}</h2>
     ${shipFormHtml(s)}
     <div class="modal-actions">
-      <button class="btn btn-danger btn-sm" onclick="deleteShip('${id}')">Delete</button>
+      <button class="btn btn-ghost btn-sm" onclick="deleteShip('${id}')" style="margin-right:auto;color:var(--text-muted)">Delete</button>
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
       <button class="btn" onclick="saveShip('${id}')">Save</button>
     </div>`);
@@ -5428,11 +5428,7 @@ window.saveShip = async function(id) {
 
 window.deleteShip = async function(id) {
   const s = (appData.ships || {})[id];
-  const isSunkOrCaptured = s && (s.status === 'sunk' || s.status === 'captured');
-  const warning = isSunkOrCaptured
-    ? `If this ship has been sunk or captured, change the ship status instead of deleting.\n\n`
-    : '';
-  if (!confirm(`${warning}Delete ${s?.name}? This cannot be undone.`)) return;
+  if (!confirm(`If this ship has been sunk or captured, change the ship status instead of deleting.\n\nDelete ${s?.name}? This cannot be undone.`)) return;
   await remove(cref(`/ships/${id}`));
   closeModal(); showToast('Ship removed');
 };
