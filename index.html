@@ -2062,32 +2062,28 @@ function renderMap() {
   const moveDone = (appData.meta || {}).movementDone || {};
   const milPlayers = Object.entries(players).filter(([,p]) => p.faction && !MERCHANT_FACTIONS.includes(p.faction) && p.faction !== 'Merchant');
   const allConfirmed = milPlayers.length > 0 && milPlayers.every(([pid]) => moveDone[pid]);
-  const movementStatusLines = milPlayers.map(([pid, p]) => {
+  const playerChips = milPlayers.map(([pid, p]) => {
     const done = !!moveDone[pid];
-    return `<div style="display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span>${FACTION_FLAG[p.faction]||''} ${p.name}</span>
-      ${done
-        ? `<span style="color:var(--green);display:flex;align-items:center;gap:8px">✓ Confirmed
-            <button class="btn btn-sm" style="font-size:0.72rem;padding:2px 7px;opacity:0.7" onclick="toggleMovement('${pid}',false)">Undo</button>
-           </span>`
-        : `<button class="btn btn-sm" style="background:rgba(200,130,30,0.12);color:#c8821e;border-color:#c8821e" onclick="toggleMovement('${pid}',true)">Confirm Movement</button>`
-      }
-    </div>`;
-  }).join('');
+    return done
+      ? `<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem">
+           ${FACTION_FLAG[p.faction]||''} <span style="color:var(--green)">✓ ${p.name}</span>
+           <button class="btn btn-sm" style="font-size:0.68rem;padding:1px 6px;opacity:0.6" onclick="toggleMovement('${pid}',false)">Undo</button>
+         </span>`
+      : `<span style="display:inline-flex;align-items:center;gap:5px;font-size:0.75rem">
+           ${FACTION_FLAG[p.faction]||''} <span style="color:var(--text-muted)">${p.name}</span>
+           <button class="btn btn-sm" style="font-size:0.68rem;padding:1px 8px;color:#c8821e;border-color:#c8821e;background:rgba(200,130,30,0.1)" onclick="toggleMovement('${pid}',true)">Confirm</button>
+         </span>`;
+  }).join(`<span style="color:var(--border-strong);margin:0 2px">|</span>`);
 
-  const confirmBar = allConfirmed
-    ? `<div style="position:absolute;top:0;left:0;right:0;background:rgba(15,60,35,0.85);border-bottom:1px solid rgba(76,175,130,0.25);padding:8px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-size:0.65rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:rgba(255,255,255,0.45);white-space:nowrap">Movement</span>
-        ${movementStatusLines}
-        <span style="margin-left:auto;font-size:0.68rem;font-weight:600;color:#4caf82;white-space:nowrap">✓ Interception unlocked</span>
-       </div>`
-    : `<div style="position:absolute;top:0;left:0;right:0;background:rgba(12,18,28,0.85);border-bottom:1px solid rgba(255,255,255,0.1);padding:8px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="font-size:0.65rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:rgba(255,255,255,0.45);white-space:nowrap">Movement</span>
-        ${movementStatusLines}
-       </div>`;
+  const confirmBar = `<div style="max-width:663px;margin:0 auto 6px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span style="font-size:0.65rem;font-weight:700;letter-spacing:0.07em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap">Movement</span>
+    <span style="color:var(--border-strong);margin:0 2px">|</span>
+    ${playerChips}
+    ${allConfirmed ? `<span style="margin-left:auto;font-size:0.72rem;font-weight:600;color:var(--green);white-space:nowrap">✓ Interception unlocked</span>` : ''}
+  </div>`;
 
-  return `<div style="position:relative;max-width:663px;margin:0 auto;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#7aa8c0">
-    ${confirmBar}
+  return `${confirmBar}
+  <div style="position:relative;max-width:663px;margin:0 auto;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:#7aa8c0">
     <img src="MAP.jpg" style="width:100%;display:block;vertical-align:bottom"
          onerror="this.style.opacity='0.15'">
     ${portBubbleHtml}
