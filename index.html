@@ -5428,7 +5428,11 @@ window.saveShip = async function(id) {
 
 window.deleteShip = async function(id) {
   const s = (appData.ships || {})[id];
-  if (!confirm(`Delete ${s?.name}? This cannot be undone.`)) return;
+  const isSunkOrCaptured = s && (s.status === 'sunk' || s.status === 'captured');
+  const warning = isSunkOrCaptured
+    ? `If this ship has been sunk or captured, change the ship status instead of deleting.\n\n`
+    : '';
+  if (!confirm(`${warning}Delete ${s?.name}? This cannot be undone.`)) return;
   await remove(cref(`/ships/${id}`));
   closeModal(); showToast('Ship removed');
 };
