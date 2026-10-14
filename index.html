@@ -1280,10 +1280,16 @@ function shipCard(id, s) {
   if (s.capturedBy) {
     const captor = allShips[s.capturedBy];
     const captorName = captor ? captor.name : s.capturedBy;
+    const capturedFromPlayer = s.capturedFrom ? (appData.players || {})[s.capturedFrom] : null;
+    const capturedFromStr = capturedFromPlayer
+      ? (capturedFromPlayer.name || capturedFromPlayer.officerName || s.capturedFrom)
+      : s.capturedFrom;
     if (s.previousName) {
-      captureLines += `<div class="ship-notes" style="color:var(--text-muted)">Formerly: ${s.previousName} · Captured by ${captorName}</div>`;
+      const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
+      captureLines += `<div class="ship-notes" style="color:var(--text-muted)">Formerly: ${s.previousName} · Captured by ${captorName}${fromPart}</div>`;
     } else {
-      captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captorName}</div>`;
+      const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
+      captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captorName}${fromPart}</div>`;
     }
   }
   // Show any ships this vessel has captured
@@ -5385,6 +5391,7 @@ window.saveShip = async function(id) {
       availableIn: '',
       notes: `Captured from ${(appData.players||{})[existing.player]?.name || existing.player}`,
       previousName: existing.name,
+      capturedFrom: existing.player,
       player: capturingPlayer || existing.player,
       faction: capturingOwner ? capturingOwner.faction : existing.faction,
     };
