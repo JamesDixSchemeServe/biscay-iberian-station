@@ -4021,8 +4021,8 @@ window.showPlayerModal = function(pid, editMode) {
       const ships = appData.ships || {};
       // Ships this player owns/owned that were prizes (have capturedBy set, meaning they came from an enemy)
       const playerShipIds = new Set(Object.entries(ships).filter(([,s]) => s.player === pid).map(([id]) => id));
-      // All ships captured by one of this player's ships (look at lost/sold/active ships whose capturedBy points to a player ship)
-      const prizeShips = Object.values(ships).filter(s => s.capturedBy && playerShipIds.has(s.capturedBy));
+      // Prize copies owned by this player (not the enemy originals)
+      const prizeShips = Object.values(ships).filter(s => s.player === pid && s.capturedBy && playerShipIds.has(s.capturedBy));
       if (!prizeShips.length) return '';
       const resIcons = { purchased:'⚓', prize_money:'💰', lost_on_passage:'💀', rejected_by_admiralty:'💀' };
       const resLabels = { purchased:'Purchased by Admiralty', prize_money:'Prize money', lost_on_passage:'Lost on passage', rejected_by_admiralty:'Rejected by Admiralty' };
