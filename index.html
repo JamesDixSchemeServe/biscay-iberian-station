@@ -1285,7 +1285,7 @@ function shipCard(id, s) {
     const capturedFromStr = capturedFromPlayer
       ? (capturedFromPlayer.name || capturedFromPlayer.officerName || s.capturedFrom)
       : s.capturedFrom;
-    const formerlyPart = s.previousName ? `formerly ${s.previousName} · ` : '';
+    const formerlyPart = s.previousName && s.name !== s.previousName ? `formerly ${s.previousName} · ` : '';
     const displayText = `${formerlyPart}Captured by ${captorName}`;
     const tooltip = capturedFromStr ? `Captured from ${capturedFromStr}` : '';
     captureHeaderText = { display: displayText, tooltip };
@@ -4037,8 +4037,8 @@ window.showPlayerModal = function(pid, editMode) {
           const icon = resIcons[s.prizeResolution] || (s.status==='captured'?'⏳':'💰');
           const label = resLabels[s.prizeResolution] || (s.status==='captured'?'Pending decision':'Sold for prize money');
           const displayName = s.previousName || s.name;
-          const nowPart = s.prizeResolution === 'purchased' && s.name !== s.previousName ? ` (now ${s.name})` : '';
-          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${displayName}</strong>${nowPart} — ${label}</div>`;
+          const renamedPart = s.prizeResolution === 'purchased' && s.previousName && s.name !== s.previousName ? ` — renamed ${s.name}` : '';
+          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${displayName}</strong> — ${label}${renamedPart}</div>`;
         }).join('')}
       </div>`;
     })()}
