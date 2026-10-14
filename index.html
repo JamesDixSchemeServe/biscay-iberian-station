@@ -4020,9 +4020,14 @@ window.showPlayerModal = function(pid, editMode) {
     ${(() => {
       const ships = appData.ships || {};
       // Ships this player owns/owned that were prizes (have capturedBy set, meaning they came from an enemy)
-      const playerShipIds = new Set(Object.entries(ships).filter(([,s]) => s.player === pid).map(([id]) => id));
-      // Prize copies owned by this player (not the enemy originals)
-      const prizeShips = Object.values(ships).filter(s => s.player === pid && s.capturedBy && playerShipIds.has(s.capturedBy));
+      const playerShipIds = new Set(Object.entries(ships).filter(([,s]) => s.player === pid).map(([sid]) => sid));
+      // Original lost ships captured by one of this player's vessels (same logic as ship card trophy flag)
+      const capturedOriginals = Object.values(ships).filter(s => s.status === 'lost' && s.capturedBy && playerShipIds.has(s.capturedBy));
+      // For each, find the prize copy (owned by this player, with matching previousName or capturedBy)
+      const prizeShips = capturedOriginals.map(orig => {
+        const copy = Object.values(ships).find(s => s.player === pid && s.capturedBy === orig.capturedBy && s.previousName === orig.name);
+        return copy || orig; // fall back to original if no copy found
+      });
       if (!prizeShips.length) return '';
       const resIcons = { purchased:'⚓', prize_money:'💰', lost_on_passage:'💀', rejected_by_admiralty:'💀' };
       const resLabels = { purchased:'Purchased by Admiralty', prize_money:'Prize money', lost_on_passage:'Lost on passage', rejected_by_admiralty:'Rejected by Admiralty' };
@@ -4036,10 +4041,12 @@ window.showPlayerModal = function(pid, editMode) {
         <div class="section-label" style="margin-top:0;margin-bottom:6px">Prizes Taken (${prizeShips.length})</div>
         <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px">${parts.join(' · ') || 'None resolved'}</div>
         ${prizeShips.map(s => {
-          const icon = resIcons[s.prizeResolution] || (s.status==='captured'?'⏳':'•');
-          const label = resLabels[s.prizeResolution] || (s.status==='captured'?'Pending decision':'Unknown');
+          const icon = resIcons[s.prizeResolution] || (s.status==='captured'?'⏳':'💰');
+          const label = resLabels[s.prizeResolution] || (s.status==='captured'?'Pending decision':'Prize money');
           const captor = ships[s.capturedBy];
-          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${s.previousName||s.name}</strong>${s.previousName?` (now ${s.name})`:''}${captor?` · via ${captor.name}`:''} — ${label}</div>`;
+          const displayName = s.previousName || s.name;
+          const currentName = s.previousName && s.name !== s.previousName ? ` (now ${s.name})` : '';
+          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${displayName}</strong>${currentName}${captor?` · via ${captor.name}`:''} — ${label}</div>`;
         }).join('')}
       </div>`;
     })()}
