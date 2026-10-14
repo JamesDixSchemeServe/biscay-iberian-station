@@ -1286,10 +1286,12 @@ function shipCard(id, s) {
       : s.capturedFrom;
     if (s.previousName) {
       const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
-      captureLines += `<div class="ship-notes" style="color:var(--text-muted)">Formerly: ${s.previousName} · Captured by ${captorName}${fromPart}</div>`;
+      const fullText = `Captured by ${captorName}${fromPart}`;
+      captureLines += `<div class="ship-notes" style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${fullText}">${fullText}</div>`;
     } else {
       const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
-      captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captorName}${fromPart}</div>`;
+      const fullText = `⚔ Captured by ${captorName}${fromPart}`;
+      captureLines += `<div class="ship-notes" style="color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${fullText}">${fullText}</div>`;
     }
   }
   // Show any ships this vessel has captured
@@ -1314,7 +1316,8 @@ function shipCard(id, s) {
         ${s.officer ? `<div class="squadron-label" style="color:var(--text-muted)">Cdr: ${s.officer}</div>` : ''}
         ${s.squadron ? `<div class="squadron-label">Squadron ${s.squadron}</div>` : ''}
       </div>
-      <div class="ship-actions">
+      <div class="ship-actions" style="align-items:center">
+        ${s.previousName && s.capturedBy ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap">ex ${s.previousName}</span>` : ''}
         ${(() => {
           if (!_isRated(s.type) || !s.player) return '';
           const owner = (appData.players||{})[s.player];
