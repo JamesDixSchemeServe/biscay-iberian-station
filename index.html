@@ -693,6 +693,7 @@ function renderOverview() {
   // Recent dispatches
   const allLog = appData.log || {};
   const recentDispatches = Object.entries(allLog)
+    .filter(([,e]) => e.type === 'dispatch' && e.letter)
     .sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''))
     .slice(0,5);
   if (recentDispatches.length) {
@@ -1067,7 +1068,7 @@ function renderPlayer(pid) {
   // Battle dispatches involving this player
   const allLog = appData.log || {};
   const playerReports = Object.entries(allLog).filter(([,e]) =>
-    e.reporter === pid
+    e.type === 'dispatch' && e.letter && e.reporter === pid
   ).sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
   if (playerReports.length) {
     html += `<div class="section-label" style="margin-top:20px">Latest Dispatches</div>`;
@@ -1278,7 +1279,12 @@ function shipCard(id, s) {
   }
   if (s.capturedBy) {
     const captor = allShips[s.capturedBy];
-    captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captor ? captor.name : s.capturedBy}</div>`;
+    const captorName = captor ? captor.name : s.capturedBy;
+    if (s.previousName) {
+      captureLines += `<div class="ship-notes" style="color:var(--text-muted)">Formerly: ${s.previousName} · Captured by ${captorName}</div>`;
+    } else {
+      captureLines += `<div class="ship-notes" style="color:var(--red)">⚔ Captured by ${captorName}</div>`;
+    }
   }
   // Show any ships this vessel has captured
   const prizes = Object.entries(allShips).filter(([,ps]) => ps.capturedBy === id && ps.status === 'lost');
@@ -1360,7 +1366,7 @@ function shipCard(id, s) {
       return html;
     })()}
     ${captureLines}
-    ${(s.previousName || s.notes) ? `<div class="ship-notes" style="color:var(--text-muted)">${[s.previousName ? `Formerly: ${s.previousName}` : '', s.notes || ''].filter(Boolean).join(' · ')}</div>` : ''}
+    ${((s.previousName && !s.capturedBy) || s.notes) ? `<div class="ship-notes" style="color:var(--text-muted)">${[s.previousName && !s.capturedBy ? `Formerly: ${s.previousName}` : '', s.notes || ''].filter(Boolean).join(' · ')}</div>` : ''}
     ${(() => {
       if (s.status !== 'captured' || s.prizeResolution) return '';
       // Only show prize UI if this ship is a prize on the capturing player's roster.
@@ -3592,7 +3598,7 @@ function renderRules() {
 function renderLog() {
   const log = appData.log || {};
   const entries = Object.entries(log)
-    .filter(([,e]) => e.type === 'dispatch')
+    .filter(([,e]) => e.type === 'dispatch' && e.letter)
     .sort(([,a],[,b]) => (b.timestamp||'').localeCompare(a.timestamp||''));
   let html = `<div class="ships-header"><div>Dispatches</div><button class="btn btn-sm" onclick="openAddLog()">+ Dispatch</button></div>`;
   if (!entries.length) html += `<div class="empty-state">No dispatches yet.</div>`;
