@@ -1317,7 +1317,7 @@ function shipCard(id, s) {
         ${s.squadron ? `<div class="squadron-label">Squadron ${s.squadron}</div>` : ''}
       </div>
       <div class="ship-actions" style="align-items:center">
-        ${s.previousName && s.capturedBy ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap">ex ${s.previousName}</span>` : ''}
+        ${s.previousName && s.capturedBy ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap">formerly ${s.previousName}</span>` : ''}
         ${(() => {
           if (!_isRated(s.type) || !s.player) return '';
           const owner = (appData.players||{})[s.player];
