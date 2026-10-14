@@ -1017,7 +1017,7 @@ function renderPlayer(pid) {
   }
 
   const pShips = allPShips.filter(([,s]) => {
-    if (activeFilter === 'all') return true;
+    if (activeFilter === 'all') return s.status !== 'sold';
     if (activeFilter === 'pending') return s.status === 'captured' && !s.prizeResolution;
     if (activeFilter === 'captured') return s.status === 'captured' && s.prizeResolution;
     if (activeFilter === 'sunk') return s.status === 'sunk' || s.status === 'lost';
