@@ -4030,25 +4030,15 @@ window.showPlayerModal = function(pid, editMode) {
       });
       if (!prizeShips.length) return '';
       const resIcons = { purchased:'⚓', prize_money:'💰', lost_on_passage:'💀', rejected_by_admiralty:'💀' };
-      const resLabels = { purchased:'Purchased by Admiralty', prize_money:'Prize money', lost_on_passage:'Lost on passage', rejected_by_admiralty:'Rejected by Admiralty' };
-      const pending = prizeShips.filter(s => s.status === 'captured' && !s.prizeResolution);
-      const byRes = {};
-      prizeShips.filter(s => !(s.status === 'captured' && !s.prizeResolution)).forEach(s => {
-        const key = s.prizeResolution || 'prize_money';
-        byRes[key] = (byRes[key]||0)+1;
-      });
-      const parts = Object.entries(byRes).map(([r,n]) => `${n} ${(resLabels[r]||r).toLowerCase()}`);
-      if (pending.length) parts.push(`${pending.length} pending`);
+      const resLabels = { purchased:'Purchased by Admiralty', prize_money:'Sold for prize money', lost_on_passage:'Lost on passage', rejected_by_admiralty:'Rejected by Admiralty' };
       return `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px">
         <div class="section-label" style="margin-top:0;margin-bottom:6px">Prizes Taken (${prizeShips.length})</div>
-        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px">${parts.join(' · ') || 'None resolved'}</div>
         ${prizeShips.map(s => {
           const icon = resIcons[s.prizeResolution] || (s.status==='captured'?'⏳':'💰');
-          const label = resLabels[s.prizeResolution] || (s.status==='captured'?'Pending decision':'Prize money');
-          const captor = ships[s.capturedBy];
+          const label = resLabels[s.prizeResolution] || (s.status==='captured'?'Pending decision':'Sold for prize money');
           const displayName = s.previousName || s.name;
-          const currentName = s.previousName && s.name !== s.previousName ? ` (now ${s.name})` : '';
-          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${displayName}</strong>${currentName}${captor?` · via ${captor.name}`:''} — ${label}</div>`;
+          const nowPart = s.prizeResolution === 'purchased' && s.name !== s.previousName ? ` (now ${s.name})` : '';
+          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${displayName}</strong>${nowPart} — ${label}</div>`;
         }).join('')}
       </div>`;
     })()}
