@@ -4033,7 +4033,7 @@ window.showPlayerModal = function(pid, editMode) {
       const resLabels = { purchased:'Purchased by Admiralty', prize_money:'Prize money', lost_on_passage:'Lost on passage', rejected_by_admiralty:'Rejected by Admiralty' };
       const pending = prizeShips.filter(s => s.status === 'captured' && !s.prizeResolution);
       const byRes = {};
-      prizeShips.filter(s => s.status !== 'captured' || s.prizeResolution).forEach(s => {
+      prizeShips.filter(s => !(s.status === 'captured' && !s.prizeResolution)).forEach(s => {
         const key = s.prizeResolution || 'prize_money';
         byRes[key] = (byRes[key]||0)+1;
       });
