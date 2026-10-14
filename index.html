@@ -1371,7 +1371,7 @@ function shipCard(id, s) {
       return html;
     })()}
     ${captureLines}
-    ${((s.previousName && !s.capturedBy) || s.notes) ? `<div class="ship-notes" style="color:var(--text-muted)">${[s.previousName && !s.capturedBy ? `Formerly: ${s.previousName}` : '', s.notes || ''].filter(Boolean).join(' · ')}</div>` : ''}
+    ${(() => { const notes = (s.notes||'').trim(); const filteredNotes = (s.capturedFrom && notes.toLowerCase().startsWith('captured from')) ? '' : notes; const formerlyPart = s.previousName && !s.capturedBy ? `Formerly: ${s.previousName}` : ''; return (formerlyPart || filteredNotes) ? `<div class="ship-notes" style="color:var(--text-muted)">${[formerlyPart, filteredNotes].filter(Boolean).join(' · ')}</div>` : ''; })()}
     ${(() => {
       if (s.status !== 'captured' || s.prizeResolution) return '';
       // Only show prize UI if this ship is a prize on the capturing player's roster.
@@ -5406,7 +5406,7 @@ window.saveShip = async function(id) {
       squadron: '',
       repairPort: '',
       availableIn: '',
-      notes: `Captured from ${(appData.players||{})[existing.player]?.name || existing.player}`,
+      notes: '',
       previousName: existing.name,
       capturedFrom: existing.player,
       player: capturingPlayer || existing.player,
