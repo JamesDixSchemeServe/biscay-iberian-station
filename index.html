@@ -1277,6 +1277,7 @@ function shipCard(id, s) {
   if (sunkByMe.length) {
     captureLines += `<div class="ship-notes" style="color:var(--red)">💥 Sunk: ${sunkByMe.map(([,ps]) => ps.name).join(', ')}</div>`;
   }
+  let captureHeaderText = '';
   if (s.capturedBy) {
     const captor = allShips[s.capturedBy];
     const captorName = captor ? captor.name : s.capturedBy;
@@ -1284,15 +1285,10 @@ function shipCard(id, s) {
     const capturedFromStr = capturedFromPlayer
       ? (capturedFromPlayer.name || capturedFromPlayer.officerName || s.capturedFrom)
       : s.capturedFrom;
-    if (s.previousName) {
-      const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
-      const fullText = `Captured by ${captorName}${fromPart}`;
-      captureLines += `<div class="ship-notes" style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${fullText}">${fullText}</div>`;
-    } else {
-      const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
-      const fullText = `⚔ Captured by ${captorName}${fromPart}`;
-      captureLines += `<div class="ship-notes" style="color:var(--red);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${fullText}">${fullText}</div>`;
-    }
+    const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
+    const formerlyPart = s.previousName ? `formerly ${s.previousName} · ` : '';
+    const displayText = `${formerlyPart}Captured by ${captorName}`;
+    captureHeaderText = { display: displayText, full: `${displayText}${fromPart}` };
   }
   // Show any ships this vessel has captured
   const prizes = Object.entries(allShips).filter(([,ps]) => ps.capturedBy === id && ps.status === 'lost');
@@ -1317,7 +1313,7 @@ function shipCard(id, s) {
         ${s.squadron ? `<div class="squadron-label">Squadron ${s.squadron}</div>` : ''}
       </div>
       <div class="ship-actions" style="align-items:center">
-        ${s.previousName && s.capturedBy ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap">formerly ${s.previousName}</span>` : ''}
+        ${captureHeaderText ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="${captureHeaderText.full}">${captureHeaderText.display}</span>` : ''}
         ${(() => {
           if (!_isRated(s.type) || !s.player) return '';
           const owner = (appData.players||{})[s.player];
@@ -4390,7 +4386,7 @@ function shipFormHtml(s) {
   );
 
   return `
-    <div class="form-row"><label>Ship Name</label><input id="sf-name" value="${s.name||''}"></div>
+    <div class="form-row"><label>Ship Name</label><input id="sf-name" value="${s.name||''}" oninput="checkDuplicateShipName('sf-name','${id}')"></div>
     ${isEscorting ? `<div style="margin:-4px 0 8px;padding:6px 10px;background:rgba(126,200,227,0.12);border:1px solid rgba(126,200,227,0.4);border-radius:6px;font-size:0.82rem;color:#7ec8e3">🛡 This ship is currently escorting a merchant convoy</div>` : ''}
 
     <div class="form-grid">
@@ -5036,6 +5032,24 @@ function asCalc() {
 window.asCalc = asCalc;
 window.asTypeChange = function() { _asSuggestBroad(); asCalc(); _renderAsDecks(); };
 
+window.checkDuplicateShipName = function(inputId, excludeId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const name = input.value.trim().toLowerCase();
+  const warnId = inputId + '-dupwarn';
+  let warnEl = document.getElementById(warnId);
+  if (!warnEl) {
+    warnEl = document.createElement('div');
+    warnEl.id = warnId;
+    warnEl.style.cssText = 'font-size:0.78rem;color:#c8821e;margin-top:4px';
+    input.parentNode.appendChild(warnEl);
+  }
+  if (!name) { warnEl.textContent = ''; return; }
+  const ships = appData.ships || {};
+  const match = Object.entries(ships).find(([sid, s]) => sid !== excludeId && (s.name||'').trim().toLowerCase() === name);
+  warnEl.textContent = match ? `⚠ "${match[1].name}" already exists in this campaign` : '';
+};
+
 function _renderAsDecks() {
   if (!document.getElementById('as-decks')) return;
   document.getElementById('as-decks').innerHTML = _asDecks.map(d=>`
@@ -5178,7 +5192,7 @@ window.openAddShip = function(playerId, faction) {
       <button type="button" class="btn btn-sm btn-ghost" onclick="openHistoricalSearch()" style="width:100%;justify-content:center">🔍 Find Historical Ship</button>
     </div>
 
-    <div class="form-row"><label>Ship Name</label><input id="as-name" placeholder="e.g. HMS Badger"></div>
+    <div class="form-row"><label>Ship Name</label><input id="as-name" placeholder="e.g. HMS Badger" oninput="checkDuplicateShipName('as-name',null)"></div>
     <div class="form-row"><label>Location</label><select id="as-location">${(FACTION_PORTS[_asFaction] || FACTION_PORTS.Merchant).map(z=>`<option>${z}</option>`).join('')}</select></div>
 
     <div class="form-row"><label>Type</label><select id="as-type" onchange="asTypeChange()">${['',...SHIP_TYPES].map(t=>`<option value="${t}">${t||'— select type —'}</option>`).join('')}</select></div>
