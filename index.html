@@ -2689,8 +2689,8 @@ function renderHistory() {
     repairsCompletedByTurn[t].push(e); // push the log entry, not the ship
   }
 
-  const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧', promotion:'🎖' };
-  const officerEventTypes = new Set(['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned','promotion']);
+  const evIcons = { officer_death:'⚔', officer_captured:'⛓', officer_retired:'🎖', officer_successor:'⚓', ransom:'💰', convoy_lost:'🏴', repair_assigned:'🔧', promotion:'🎖', prize_money:'💰', prize_lost:'💀', prize_purchased:'⚓', prize_delayed:'⏳' };
+  const officerEventTypes = new Set(['officer_death','officer_captured','officer_retired','officer_successor','ransom','convoy_lost','repair_assigned','promotion','prize_money','prize_lost','prize_purchased','prize_delayed']);
 
   let html = `<div class="section-header"><h2>📜 Campaign History</h2></div>`;
 
@@ -4016,6 +4016,24 @@ window.showPlayerModal = function(pid, editMode) {
     <div style="font-size:0.78rem;color:var(--text-muted);margin:8px 0 4px;padding:6px 10px;background:var(--surface2);border-radius:4px">
       ⚓ ${currentRank} — senior rank attained
     </div>` : ''}
+
+    ${(() => {
+      const log = appData.log || {};
+      const prizeEntries = Object.values(log).filter(e => e.playerId === pid && ['prize_money','prize_lost','prize_purchased','prize_delayed'].includes(e.type));
+      if (!prizeEntries.length) return '';
+      const purchased = prizeEntries.filter(e => e.type === 'prize_purchased').length;
+      const sold = prizeEntries.filter(e => e.type === 'prize_money').length;
+      const lost = prizeEntries.filter(e => e.type === 'prize_lost').length;
+      const parts = [];
+      if (purchased) parts.push(`${purchased} purchased by Admiralty`);
+      if (sold) parts.push(`${sold} sold for prize money`);
+      if (lost) parts.push(`${lost} lost on passage`);
+      return `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px">
+        <div class="section-label" style="margin-top:0;margin-bottom:6px">Prizes Taken</div>
+        <div style="font-size:0.82rem;color:var(--text-muted)">${parts.join(' · ') || 'None'}</div>
+        ${prizeEntries.sort((a,b)=>(b.turn||0)-(a.turn||0)).slice(0,5).map(e=>`<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${({prize_money:'💰',prize_lost:'💀',prize_purchased:'⚓',prize_delayed:'⏳'}[e.type]||'•')} Turn ${e.turn} — ${e.text||''}</div>`).join('')}
+      </div>`;
+    })()}
 
     ${editMode ? `
     <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:16px">
