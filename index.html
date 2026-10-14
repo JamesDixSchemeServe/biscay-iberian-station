@@ -1285,10 +1285,10 @@ function shipCard(id, s) {
     const capturedFromStr = capturedFromPlayer
       ? (capturedFromPlayer.name || capturedFromPlayer.officerName || s.capturedFrom)
       : s.capturedFrom;
-    const fromPart = capturedFromStr ? ` · Captured from ${capturedFromStr}` : '';
     const formerlyPart = s.previousName ? `formerly ${s.previousName} · ` : '';
     const displayText = `${formerlyPart}Captured by ${captorName}`;
-    captureHeaderText = { display: displayText, full: `${displayText}${fromPart}` };
+    const tooltip = capturedFromStr ? `Captured from ${capturedFromStr}` : '';
+    captureHeaderText = { display: displayText, tooltip };
   }
   // Show any ships this vessel has captured
   const prizes = Object.entries(allShips).filter(([,ps]) => ps.capturedBy === id && ps.status === 'lost');
@@ -1313,7 +1313,7 @@ function shipCard(id, s) {
         ${s.squadron ? `<div class="squadron-label">Squadron ${s.squadron}</div>` : ''}
       </div>
       <div class="ship-actions" style="align-items:center">
-        ${captureHeaderText ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px" title="${captureHeaderText.full}">${captureHeaderText.display}</span>` : ''}
+        ${captureHeaderText ? `<span style="font-size:0.72rem;color:var(--text-muted);font-style:italic;white-space:nowrap" title="${captureHeaderText.tooltip}">${captureHeaderText.display}</span>` : ''}
         ${(() => {
           if (!_isRated(s.type) || !s.player) return '';
           const owner = (appData.players||{})[s.player];
