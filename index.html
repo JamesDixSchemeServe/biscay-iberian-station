@@ -1378,7 +1378,7 @@ function shipCard(id, s) {
       const capShip = s.capturedBy && s.capturedBy !== '__accident__' ? (appData.ships || {})[s.capturedBy] : null;
       if (capShip && capShip.player !== s.player) return '';
       if (s.prizePort) {
-        return `<div style="margin-top:6px"><span class="pending-badge" style="background:var(--surface2)">⚓ Prize crew bound for ${s.prizePort}${s.prizeReroll ? ' (re-roll)' : ''}</span> <button class="btn btn-sm btn-ghost" style="margin-left:6px" onclick="cancelPrizeCrew('${id}')">Cancel</button></div>`;
+        return `<div style="margin-top:6px"><span class="pending-badge" style="background:var(--surface2)">⚓ ${s.prizeReroll ? `Prize crew at ${s.prizePort}, decision delayed` : `Prize crew bound for ${s.prizePort}`}</span> <button class="btn btn-sm btn-ghost" style="margin-left:6px" onclick="cancelPrizeCrew('${id}')">Cancel</button></div>`;
       }
       return `<div style="margin-top:6px"><button class="btn btn-sm" onclick="sendPrizeCrew('${id}')">⚓ Send with Prize Crew</button></div>`;
     })()}
@@ -4018,20 +4018,29 @@ window.showPlayerModal = function(pid, editMode) {
     </div>` : ''}
 
     ${(() => {
-      const log = appData.log || {};
-      const prizeEntries = Object.values(log).filter(e => e.playerId === pid && ['prize_money','prize_lost','prize_purchased','prize_delayed'].includes(e.type));
-      if (!prizeEntries.length) return '';
-      const purchased = prizeEntries.filter(e => e.type === 'prize_purchased').length;
-      const sold = prizeEntries.filter(e => e.type === 'prize_money').length;
-      const lost = prizeEntries.filter(e => e.type === 'prize_lost').length;
-      const parts = [];
-      if (purchased) parts.push(`${purchased} purchased by Admiralty`);
-      if (sold) parts.push(`${sold} sold for prize money`);
-      if (lost) parts.push(`${lost} lost on passage`);
+      const ships = appData.ships || {};
+      // Ships this player owns/owned that were prizes (have capturedBy set, meaning they came from an enemy)
+      const playerShipIds = new Set(Object.entries(ships).filter(([,s]) => s.player === pid).map(([id]) => id));
+      // All ships captured by one of this player's ships (look at lost/sold/active ships whose capturedBy points to a player ship)
+      const prizeShips = Object.values(ships).filter(s => s.capturedBy && playerShipIds.has(s.capturedBy));
+      if (!prizeShips.length) return '';
+      const resIcons = { purchased:'⚓', prize_money:'💰', lost_on_passage:'💀', rejected_by_admiralty:'💀' };
+      const resLabels = { purchased:'Purchased by Admiralty', prize_money:'Prize money', lost_on_passage:'Lost on passage', rejected_by_admiralty:'Rejected by Admiralty' };
+      const pending = prizeShips.filter(s => s.status === 'captured' && !s.prizeResolution);
+      const resolved = prizeShips.filter(s => s.prizeResolution);
+      const byRes = {};
+      resolved.forEach(s => { byRes[s.prizeResolution] = (byRes[s.prizeResolution]||0)+1; });
+      const parts = Object.entries(byRes).map(([r,n]) => `${n} ${(resLabels[r]||r).toLowerCase()}`);
+      if (pending.length) parts.push(`${pending.length} pending`);
       return `<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px">
-        <div class="section-label" style="margin-top:0;margin-bottom:6px">Prizes Taken</div>
-        <div style="font-size:0.82rem;color:var(--text-muted)">${parts.join(' · ') || 'None'}</div>
-        ${prizeEntries.sort((a,b)=>(b.turn||0)-(a.turn||0)).slice(0,5).map(e=>`<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${({prize_money:'💰',prize_lost:'💀',prize_purchased:'⚓',prize_delayed:'⏳'}[e.type]||'•')} Turn ${e.turn} — ${e.text||''}</div>`).join('')}
+        <div class="section-label" style="margin-top:0;margin-bottom:6px">Prizes Taken (${prizeShips.length})</div>
+        <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:6px">${parts.join(' · ') || 'None resolved'}</div>
+        ${prizeShips.map(s => {
+          const icon = resIcons[s.prizeResolution] || (s.status==='captured'?'⏳':'•');
+          const label = resLabels[s.prizeResolution] || (s.status==='captured'?'Pending decision':'Unknown');
+          const captor = ships[s.capturedBy];
+          return `<div style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">${icon} <strong style="color:var(--text)">${s.previousName||s.name}</strong>${s.previousName?` (now ${s.name})`:''}${captor?` · via ${captor.name}`:''} — ${label}</div>`;
+        }).join('')}
       </div>`;
     })()}
 
@@ -4381,7 +4390,7 @@ function _calcPortRepair(port, spCurrent, spMax, structuralDamage, shipLocation)
   return { cost, repairTurns, travelTurns, totalTurns: repairTurns + travelTurns };
 }
 
-function shipFormHtml(s) {
+function shipFormHtml(s, id) {
   const players = Object.entries(appData.players || {});
   const ownerPlayer = (appData.players || {})[s.player];
 
@@ -4577,7 +4586,7 @@ window.openEditShip = function(id) {
   _asBroad = Object.assign({H:0,M:0,L:0,HC:0,C:0,LC:0}, s.broadside||{});
   showModal(`<button class="modal-close" onclick="closeModal()">×</button>
     <h2>Edit ${s.name}</h2>
-    ${shipFormHtml(s)}
+    ${shipFormHtml(s, id)}
     <div class="modal-actions">
       <button class="btn btn-ghost btn-sm" onclick="deleteShip('${id}')" style="margin-right:auto;color:var(--text-muted)">Delete</button>
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
