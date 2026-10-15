@@ -2295,6 +2295,35 @@ function renderInterceptionTab() {
     </div>`;
   }
 
+  // Unresolved battles banner
+  const turnLog = Array.isArray(meta.interceptionLog?.[turn])
+    ? meta.interceptionLog[turn]
+    : Object.values(meta.interceptionLog?.[turn] || {});
+  const unresolvedBattles = turnLog.map((r,i) => ({r,i})).filter(({r}) => (r.intercepts || r.chosen) && !r.outcome);
+  let bannerHtml = '';
+  if (unresolvedBattles.length) {
+    bannerHtml = `<div style="border:1px solid rgba(200,130,30,0.5);background:rgba(200,130,30,0.12);border-radius:8px;padding:14px 18px;margin-bottom:18px">
+      <div style="font-weight:700;font-size:0.9rem;color:#c8821e;margin-bottom:10px">⚔ Battles Awaiting Outcome</div>`;
+    unresolvedBattles.forEach(({r, i}) => {
+      const seekerPlayer = players[r.seekerPlayerId] || {};
+      const targetPlayer = players[r.targetPlayerId] || {};
+      const fac1 = seekerPlayer.faction || '';
+      const fac2 = targetPlayer.faction || '';
+      const opt1 = fac1 ? `<option value="${fac1} Victory">${fac1} Victory</option>` : '';
+      const opt2 = fac2 ? `<option value="${fac2} Victory">${fac2} Victory</option>` : '';
+      bannerHtml += `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:0.85rem;padding:7px 0;${i>0?'border-top:1px solid rgba(200,130,30,0.25)':''}">
+        <span style="flex:1;min-width:200px">${FACTION_FLAG[fac1]||''} ${r.seekerName} vs ${FACTION_FLAG[fac2]||''} ${r.targetName} — ${r.zone}</span>
+        <select id="battle-outcome-${turn}-${i}" style="font-size:0.82rem;padding:3px 6px;border-radius:4px;border:1px solid var(--border);background:var(--surface)">
+          <option value="">— Select outcome —</option>
+          ${opt1}${opt2}
+          <option value="Draw">Draw</option>
+        </select>
+        <button class="btn btn-sm" style="font-size:0.78rem;padding:4px 10px" onclick="recordBattleOutcome(${turn},${i},null)">Record Outcome</button>
+      </div>`;
+    });
+    bannerHtml += `</div>`;
+  }
+
   const usedThisTurn = meta.interceptionUsed || {};
   const sqnUsed = key => !!usedThisTurn[key.replace(/\|/g,'_')];
 
@@ -2350,7 +2379,7 @@ function renderInterceptionTab() {
       </div>`;
     }).join('')}` : '';
 
-  if (!contestedZones.length && !turnResults.length) {
+  if (!contestedZones.length && !turnResults.length && !bannerHtml) {
     return `<div style="max-width:660px;margin:0 auto;padding:24px 0;text-align:center;color:var(--text-muted)">
       No contested zones this turn — no interception checks needed.</div>`;
   }
@@ -2433,6 +2462,7 @@ function renderInterceptionTab() {
   return `<div style="max-width:660px;margin:0 auto;padding:12px 0">
     <h2 style="margin-bottom:4px">⚔ Interception — Turn ${turn}</h2>
     <p style="font-size:0.82rem;color:var(--text-muted);margin:0 0 14px">Roll 2D6 per matchup. 7+ = interception. 12 always succeeds, 2 always fails. Max ±3 modifier.</p>
+    ${bannerHtml}
     ${zonesHtml}
     ${logHtml}
   </div>`;
@@ -2591,6 +2621,16 @@ window.rollInterception = function(zoneId) {
   const existingLog = appData.meta.interceptionLog[turn];
   if (!Array.isArray(existingLog)) appData.meta.interceptionLog[turn] = Object.values(existingLog || {});
   const logIdx = appData.meta.interceptionLog[turn].length;
+  // Add ship snapshot when battle is confirmed (intercepts === true)
+  if (intercepts) {
+    const _buildSnap = (playerId, squadron) => Object.values(appData.ships || {})
+      .filter(s => s.player === playerId && (!squadron || s.squadron === squadron))
+      .map(s => ({ id: s.id||'', name: s.name||'', spCurrent: s.spCurrent, spMax: s.spMax, status: s.status }));
+    logEntry.shipSnapshot = {
+      seeker: seekEntry2 ? _buildSnap(seekEntry2.player, seekEntry2.squadron) : [],
+      target: tgtEntry2  ? _buildSnap(tgtEntry2.player,  tgtEntry2.squadron)  : [],
+    };
+  }
   updates[`/meta/interceptionLog/${turn}/${logIdx}`] = logEntry;
   appData.meta.interceptionLog[turn].push(logEntry);
 
@@ -2647,10 +2687,81 @@ window.chooseBattle = function(zoneId) {
   const existingLog = appData.meta.interceptionLog[turn];
   if (!Array.isArray(existingLog)) appData.meta.interceptionLog[turn] = Object.values(existingLog || {});
   const logIdx = appData.meta.interceptionLog[turn].length;
+  // Ship snapshot for chooseBattle
+  const _buildSnapC = (playerId, squadron) => Object.values(appData.ships || {})
+    .filter(s => s.player === playerId && (!squadron || s.squadron === squadron))
+    .map(s => ({ id: s.id||'', name: s.name||'', spCurrent: s.spCurrent, spMax: s.spMax, status: s.status }));
+  logEntry.shipSnapshot = {
+    seeker: seekEntry ? _buildSnapC(seekEntry.player, seekEntry.squadron) : [],
+    target: tgtEntry  ? _buildSnapC(tgtEntry.player,  tgtEntry.squadron)  : [],
+  };
   updates[`/meta/interceptionLog/${turn}/${logIdx}`] = logEntry;
   appData.meta.interceptionLog[turn].push(logEntry);
 
   update(cref('/'), updates);
+};
+
+window.recordBattleOutcome = async function(turn, logIdx, outcome) {
+  if (!outcome) {
+    const sel = document.getElementById(`battle-outcome-${turn}-${logIdx}`);
+    outcome = sel ? sel.value : '';
+  }
+  if (!outcome) { showToast('Select an outcome first'); return; }
+  const log = (appData.meta && appData.meta.interceptionLog && appData.meta.interceptionLog[turn]) || [];
+  const entry = Array.isArray(log) ? log[logIdx] : Object.values(log)[logIdx];
+  if (!entry) { showToast('Battle entry not found'); return; }
+  const _buildSnapO = (playerId, squadron) => Object.values(appData.ships || {})
+    .filter(s => s.player === playerId && (!squadron || s.squadron === squadron))
+    .map(s => ({ id: s.id||'', name: s.name||'', spCurrent: s.spCurrent, spMax: s.spMax, status: s.status }));
+  const closingSnapshot = {
+    seeker: entry.seekerPlayerId ? _buildSnapO(entry.seekerPlayerId, entry.seekerSquadron) : [],
+    target: entry.targetPlayerId ? _buildSnapO(entry.targetPlayerId, entry.targetSquadron)  : [],
+  };
+  await update(cref('/'), {
+    [`/meta/interceptionLog/${turn}/${logIdx}/outcome`]: outcome,
+    [`/meta/interceptionLog/${turn}/${logIdx}/closingSnapshot`]: closingSnapshot,
+  });
+
+  // Build battle summary from diff of opening vs closing snapshots
+  const opening = entry.shipSnapshot || {};
+  const openingAll = [...(opening.seeker||[]), ...(opening.target||[])];
+  const closingAll = [...closingSnapshot.seeker, ...closingSnapshot.target];
+  const currentShips = appData.ships || {};
+  const summaryLines = [];
+
+  openingAll.forEach(before => {
+    const after = closingAll.find(s => s.id === before.id) || {};
+    const current = currentShips[before.id] || {};
+    const spLost = (before.spCurrent || 0) - (after.spCurrent ?? before.spCurrent);
+    const statusChanged = after.status && after.status !== before.status;
+
+    if (statusChanged && (after.status === 'sunk' || after.status === 'lost')) {
+      if (after.status === 'sunk') {
+        const sunkByShip = current.sunkBy ? currentShips[current.sunkBy] : null;
+        summaryLines.push(`💥 <strong>${before.name}</strong> was sunk${sunkByShip ? ` by <strong>${sunkByShip.name}</strong>` : ''}`);
+      } else {
+        const captorShip = current.capturedBy ? currentShips[current.capturedBy] : null;
+        summaryLines.push(`⚔ <strong>${before.name}</strong> was taken as a prize${captorShip ? ` by <strong>${captorShip.name}</strong>` : ''}`);
+      }
+    } else if (spLost > 0) {
+      const severity = spLost >= (before.spMax * 0.5) ? 'heavy' : spLost >= (before.spMax * 0.25) ? 'moderate' : 'minor';
+      summaryLines.push(`🔧 <strong>${before.name}</strong> took ${severity} damage (${spLost} SP)`);
+    }
+  });
+
+  const summaryHtml = summaryLines.length
+    ? summaryLines.map(l => `<div style="font-size:0.83rem;padding:4px 0;border-bottom:1px solid var(--border)">${l}</div>`).join('')
+    : `<div style="font-size:0.83rem;color:var(--text-muted)">No changes detected.</div>`;
+
+  showModal(`<button class="modal-close" onclick="closeModal()">×</button>
+    <h2>⚔ ${outcome}</h2>
+    <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:12px">${entry.seekerName} vs ${entry.targetName} — ${entry.zone}</div>
+    ${summaryHtml}
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal()">Close</button>
+    </div>`);
+
+  renderCurrentTab();
 };
 
 // ─── HISTORY ─────────────────────────────────────────────────────────────────
@@ -2821,11 +2932,15 @@ function renderHistory() {
         const label = r.chosen
           ? `<span style="font-size:0.75rem;color:var(--text-muted);font-style:italic">Battle chosen</span>`
           : `<span style="font-size:0.75rem;color:var(--accent)">Intercepted</span>`;
+        const outcomeHtml = r.outcome
+          ? `<span style="font-size:0.75rem;font-weight:700;color:var(--green);margin-left:8px">${r.outcome}</span>`
+          : '';
         html += `<div style="display:flex;align-items:center;gap:10px;padding:7px 12px;font-size:0.82rem;${i>0?'border-top:1px solid var(--border)':''}">
           <span style="color:var(--accent);flex-shrink:0">⚔</span>
           <span style="color:var(--text-muted);min-width:52px;flex-shrink:0">${r.zone}</span>
           <span style="flex:1">${seekFlag} ${r.seekerName} vs ${tgtFlag} ${r.targetName}</span>
           ${label}
+          ${outcomeHtml}
         </div>`;
       });
       html += `</div>`;
@@ -3806,6 +3921,21 @@ window.confirmAdvanceTurn = function() {
     reminders += `</div>`;
   }
 
+  // Unresolved battles
+  const _turnLog = (appData.meta && appData.meta.interceptionLog && appData.meta.interceptionLog[currentTurn]);
+  const _turnLogArr = Array.isArray(_turnLog) ? _turnLog : Object.values(_turnLog || {});
+  const unresolvedBattles = _turnLogArr.filter(r => (r.intercepts || r.chosen) && !r.outcome);
+  if (unresolvedBattles.length) {
+    reminders += `<div class="section-label" style="margin-top:12px;color:#c8821e">⚠ Unresolved Battles</div>
+    <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;margin-bottom:4px">`;
+    reminders += unresolvedBattles.map(r => {
+      const sp = players[r.seekerPlayerId] || {};
+      const tp = players[r.targetPlayerId] || {};
+      return row('⚔', `<strong>${FACTION_FLAG[sp.faction]||''} ${r.seekerName} vs ${FACTION_FLAG[tp.faction]||''} ${r.targetName}</strong> <span style="color:var(--text-muted)">— ${r.zone} — outcome not recorded</span>`);
+    }).join('');
+    reminders += `</div>`;
+  }
+
   if (vacantCommand.length) {
     reminders += `<div class="section-label" style="margin-top:12px;color:#c8821e">⚠ Vacant Command</div>
     <div style="background:var(--surface);border-radius:6px;border:1px solid var(--border);overflow:hidden;margin-bottom:4px">`;
@@ -3878,7 +4008,10 @@ window.confirmAdvanceTurn = function() {
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn" onclick="closeModal();adjustTurn(1)">Confirm — Advance Turn</button>
+      ${unresolvedBattles.length
+        ? `<button class="btn" disabled title="Record all battle outcomes before advancing" style="opacity:0.45;cursor:not-allowed">Confirm — Advance Turn</button>
+           <span style="font-size:0.76rem;color:#c8821e;align-self:center">Record all battle outcomes before advancing</span>`
+        : `<button class="btn" onclick="closeModal();adjustTurn(1)">Confirm — Advance Turn</button>`}
     </div>`);
 };
 
